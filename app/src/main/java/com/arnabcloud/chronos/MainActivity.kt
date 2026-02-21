@@ -4,13 +4,36 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddTask
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,9 +56,9 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 val bottomNavItems = listOf(
+    Screen.Vault,
     Screen.Timeline,
     Screen.Calendar,
-    Screen.Vault
 )
 
 class MainActivity : ComponentActivity() {
@@ -129,12 +152,12 @@ fun MainNavigation() {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Timeline.route,
+            startDestination = Screen.Vault.route,
             modifier = Modifier.padding(innerPadding)
         ) {
+            composable(Screen.Vault.route) { ChronosVaultScreen() }
             composable(Screen.Timeline.route) { ChronosHomeScreen() }
             composable(Screen.Calendar.route) { ChronosCalendarScreen() }
-            composable(Screen.Vault.route) { ChronosVaultScreen() }
         }
     }
 }
