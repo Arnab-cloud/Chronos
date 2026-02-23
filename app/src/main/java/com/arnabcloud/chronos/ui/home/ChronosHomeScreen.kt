@@ -46,7 +46,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -76,6 +75,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
@@ -87,6 +87,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+
+
+const val HourSlotHeight = 100.0
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -110,58 +113,37 @@ fun ChronosHomeScreen(viewModel: ChronosViewModel) {
         )
     }
 
-    Scaffold(
-        topBar = {
-            if (multiSelectMode) {
-                ContextualTopAppBar(
-                    selectionCount = selectedItems.size,
-                    onClose = onClearSelection,
-                    onDelete = {
-                        selectedItems.forEach { id ->
-                            viewModel.items.find { it.id == id }?.let { item ->
-                                viewModel.removeItem(item)
-                            }
-                        }
-                        onClearSelection()
-                    },
-                    onMove = { }
-                )
-            }
-        }
-    ) { innerPadding ->
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        DayPicker(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            DayPicker(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-            )
-            Timeline(
-                modifier = Modifier.weight(1f),
-                items = viewModel.getItemsForDate(LocalDate.now()),
-                selectedItems = selectedItems,
-                onItemClick = { item ->
-                    if (multiSelectMode) {
-                        if (item.id in selectedItems) selectedItems.remove(item.id) else selectedItems.add(
-                            item.id
-                        )
-                    }
-                },
-                onItemLongClick = { item ->
-                    if (!multiSelectMode) {
-                        multiSelectMode = true
-                        selectedItems.add(item.id)
-                    }
-                },
-                onAddItem = { viewModel.addItem(it) },
-                onRemoveItem = { viewModel.removeItem(it) },
-                onSetCompleted = { item, _ -> viewModel.toggleComplete(item) }
-            )
-        }
+                .fillMaxWidth()
+                .height(100.dp)
+        )
+        Timeline(
+            modifier = Modifier.weight(1f),
+            items = viewModel.getItemsForDate(LocalDate.now()),
+            selectedItems = selectedItems,
+            onItemClick = { item ->
+                if (multiSelectMode) {
+                    if (item.id in selectedItems) selectedItems.remove(item.id) else selectedItems.add(
+                        item.id
+                    )
+                }
+            },
+            onItemLongClick = { item ->
+                if (!multiSelectMode) {
+                    multiSelectMode = true
+                    selectedItems.add(item.id)
+                }
+            },
+            onAddItem = { viewModel.addItem(it) },
+            onRemoveItem = { viewModel.removeItem(it) },
+            onSetCompleted = { item, _ -> viewModel.toggleComplete(item) }
+        )
     }
 }
 
@@ -319,7 +301,7 @@ fun HourSlot(
 ) {
     Row(
         modifier = Modifier
-            .heightIn(min = 100.dp)
+            .heightIn(min = HourSlotHeight.dp)
             .fillMaxWidth()
     ) {
         Text(
@@ -601,7 +583,7 @@ fun NowLine() {
     }
 
     val minutesFromMidnight = currentTime.hour * 60 + currentTime.minute
-    val yOffset = (minutesFromMidnight * (100.0 / 60.0)) + 16.0
+    val yOffset = minutesFromMidnight * (HourSlotHeight / 60.0) + HourSlotHeight
 
     Row(
         modifier = Modifier
