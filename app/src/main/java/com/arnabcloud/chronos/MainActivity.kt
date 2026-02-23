@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -31,13 +32,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -45,20 +47,22 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.arnabcloud.chronos.ui.calendar.ChronosCalendarScreen
 import com.arnabcloud.chronos.ui.home.ChronosHomeScreen
-import com.arnabcloud.chronos.ui.vault.ChronosVaultScreen
 import com.arnabcloud.chronos.ui.theme.ChronosTheme
+import com.arnabcloud.chronos.ui.vault.AddTaskDialog
+import com.arnabcloud.chronos.ui.vault.ChronosVaultScreen
+import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 
 // --- Navigation Routes ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
+    object Vault : Screen("vault", "Tasks", Icons.Default.Inventory2)
     object Timeline : Screen("timeline", "Today", Icons.Default.Timeline)
     object Calendar : Screen("calendar", "Plan", Icons.Default.CalendarMonth)
-    object Vault : Screen("vault", "Vault", Icons.Default.Inventory2)
 }
 
 val bottomNavItems = listOf(
     Screen.Vault,
     Screen.Timeline,
-    Screen.Calendar,
+    Screen.Calendar
 )
 
 class MainActivity : ComponentActivity() {
@@ -73,10 +77,24 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainNavigation() {
+fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
     val navController = rememberNavController()
     var showSpeedDial by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var isEventCreation by remember { mutableStateOf(false) }
+
+    if (showAddDialog) {
+        AddTaskDialog(
+            isEvent = isEventCreation,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { newItem ->
+                viewModel.addItem(newItem)
+                showAddDialog = false
+            }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -119,14 +137,22 @@ fun MainNavigation() {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ExtendedFloatingActionButton(
-                            onClick = { showSpeedDial = false },
+                            onClick = {
+                                showSpeedDial = false
+                                isEventCreation = true
+                                showAddDialog = true
+                            },
                             icon = { Icon(Icons.Default.Event, contentDescription = null) },
                             text = { Text("Full Event") },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         ExtendedFloatingActionButton(
-                            onClick = { showSpeedDial = false },
+                            onClick = {
+                                showSpeedDial = false
+                                isEventCreation = false
+                                showAddDialog = true
+                            },
                             icon = { Icon(Icons.Default.AddTask, contentDescription = null) },
                             text = { Text("Quick Task") },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -155,9 +181,9 @@ fun MainNavigation() {
             startDestination = Screen.Vault.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(Screen.Vault.route) { ChronosVaultScreen() }
-            composable(Screen.Timeline.route) { ChronosHomeScreen() }
-            composable(Screen.Calendar.route) { ChronosCalendarScreen() }
+            composable(Screen.Vault.route) { ChronosVaultScreen(viewModel) }
+            composable(Screen.Timeline.route) { ChronosHomeScreen(viewModel) }
+            composable(Screen.Calendar.route) { ChronosCalendarScreen(viewModel) }
         }
     }
 }

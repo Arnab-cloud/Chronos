@@ -18,35 +18,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.arnabcloud.chronos.ui.home.TimelineItem
+import com.arnabcloud.chronos.model.TimelineItem
+import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.*
 
 @Composable
-fun ChronosCalendarScreen() {
+fun ChronosCalendarScreen(viewModel: ChronosViewModel) {
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
-    // Ensure currentMonth updates if selectedDate moves to a different month
     val currentMonth = remember(selectedDate) { YearMonth.from(selectedDate) }
     
-    val busyDays = remember { 
-        mapOf(
-            LocalDate.now().plusDays(1) to 3,
-            LocalDate.now().plusDays(3) to 1,
-            LocalDate.now().minusDays(2) to 5
-        )
+    // Calculate busy days from ViewModel
+    val busyDays = remember(viewModel.items) {
+        viewModel.items.groupBy { it.date }.mapValues { it.value.size }
     }
 
-    val agendaItems = remember(selectedDate) {
-        listOf(
-            TimelineItem(title = "Morning Standup", startTime = LocalTime.of(9, 30), isTask = false),
-            TimelineItem(title = "Review Project Specs", startTime = LocalTime.of(11, 0)),
-            TimelineItem(title = "Lunch with Team", startTime = LocalTime.of(13, 0), isTask = false),
-            TimelineItem(title = "Send Invoices", startTime = LocalTime.of(16, 0))
-        )
-    }
+    val agendaItems = viewModel.getItemsForDate(selectedDate)
 
     Column(
         modifier = Modifier
@@ -71,13 +60,13 @@ fun ChronosCalendarScreen() {
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Agenda",
+            text = "Agenda for ${selectedDate.dayOfMonth} ${selectedDate.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())}",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        AgendaList(items = agendaItems)
+        AgendaList(items = agendaItems, onToggle = { viewModel.toggleComplete(it) })
     }
 }
 
@@ -90,9 +79,6 @@ fun MonthGrid(
 ) {
     val daysInMonth = currentMonth.lengthOfMonth()
     val firstOfMonth = currentMonth.atDay(1)
-    
-    // ISO-8601: Monday is 1, Sunday is 7.
-    // For a grid starting on Monday, we need (dayOfWeek - 1) empty slots.
     val dayOfWeekOffset = firstOfMonth.dayOfWeek.value 
     val leadingEmptyDays = List(dayOfWeekOffset - 1) { null }
     
@@ -174,7 +160,7 @@ fun MonthGrid(
 }
 
 @Composable
-fun AgendaList(items: List<TimelineItem>) {
+fun AgendaList(items: List<TimelineItem>, onToggle: (TimelineItem) -> Unit) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize()
@@ -199,6 +185,9 @@ fun AgendaList(items: List<TimelineItem>) {
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
+                        if (item.details.isNotBlank()) {
+                            Text(text = item.details, style = MaterialTheme.typography.bodySmall)
+                        }
                         Text(
                             text = item.startTime.toString(),
                             style = MaterialTheme.typography.labelSmall,
@@ -206,7 +195,7 @@ fun AgendaList(items: List<TimelineItem>) {
                         )
                     }
                     if (item.isTask) {
-                        Checkbox(checked = item.isCompleted, onCheckedChange = {})
+                        Checkbox(checked = item.isCompleted, onCheckedChange = { onToggle(item) })
                     } else {
                          Badge(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
