@@ -102,7 +102,7 @@ fun MonthGrid(
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier.height(260.dp),
+            modifier = Modifier.height(300.dp),
             userScrollEnabled = false
         ) {
             items(gridItems) { date ->
@@ -114,7 +114,7 @@ fun MonthGrid(
                     Column(
                         modifier = Modifier
                             .aspectRatio(1f)
-                            .padding(2.dp)
+//                            .padding(vertical = 1.dp)
                             .clip(CircleShape)
                             .background(
                                 when {
@@ -188,13 +188,17 @@ fun AgendaList(items: List<TimelineItem>, onToggle: (TimelineItem) -> Unit) {
                         if (item.details.isNotBlank()) {
                             Text(text = item.details, style = MaterialTheme.typography.bodySmall)
                         }
+                        val timeStr = when (item) {
+                            is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.toString()
+                            is TimelineItem.Task -> "Due: ${item.deadlineDate ?: "No deadline"}"
+                        }
                         Text(
-                            text = item.startTime.toString(),
+                            text = timeStr,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )
                     }
-                    if (item.isTask) {
+                    if (item is TimelineItem.Task) {
                         Checkbox(checked = item.isCompleted, onCheckedChange = { onToggle(item) })
                     } else {
                          Badge(

@@ -1,5 +1,6 @@
 package com.arnabcloud.chronos.ui.vault
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -56,12 +58,10 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun ChronosVaultScreen(viewModel: ChronosViewModel) {
-    // We removed showAddDialog from here because it's handled globally in MainActivity
-    val tasks = viewModel.items.filter { it.isTask }
+    val items = viewModel.items
 
     Column(
         modifier = Modifier
@@ -70,7 +70,7 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
             .padding(16.dp)
     ) {
         Text(
-            text = "My Tasks",
+            text = "My Tasks & Events",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 24.dp)
@@ -89,7 +89,7 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    val remaining = tasks.count { !it.isCompleted }
+                    val remaining = items.count { it is TimelineItem.Task && !it.isCompleted }
                     Text(
                         text = "$remaining tasks remaining",
                         style = MaterialTheme.typography.titleMedium,
@@ -107,11 +107,155 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(tasks) { task ->
-                VaultTaskCard(
-                    task = task,
-                    onToggle = { viewModel.toggleComplete(task) },
-                    onDelete = { viewModel.removeItem(task) }
+            items(items) { item ->
+                VaultItemCard(
+                    item = item,
+                    onToggle = { viewModel.toggleComplete(item) },
+                    onDelete = { viewModel.removeItem(item) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun VaultItemCard(
+    item: TimelineItem,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val isTask = item is TimelineItem.Task
+    val isCompleted = if (item is TimelineItem.Task) item.isCompleted else false
+    val isMissed = if (item is TimelineItem.Task) item.isMissed() else false
+
+    val border = when {
+        isMissed -> BorderStroke(2.dp, MaterialTheme.colorScheme.error)
+        !isTask -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+        else -> null
+    }
+
+    val containerColor = when {
+        isCompleted -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        !isTask -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+        isMissed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.05f)
+        else -> MaterialTheme.colorScheme.surface
+    }
+
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        border = border ?: CardDefaults.outlinedCardBorder(),
+        colors = CardDefaults.outlinedCardColors(containerColor = containerColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isTask) {
+                IconButton(onClick = onToggle) {
+                    Icon(
+                        imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                        contentDescription = "Toggle Status",
+                        tint = if (isCompleted) MaterialTheme.colorScheme.primary else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.padding(12.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                        color = if (isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (!isTask) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                            Text("Event", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                if (item.details.isNotBlank()) {
+                    Text(
+                        text = item.details,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Time/Date Info
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        val timeStr = when (item) {
+                            is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.format(
+                                DateTimeFormatter.ofPattern("hh:mm a")
+                            )
+
+                            is TimelineItem.Task -> "Task"
+                        }
+                        Text(
+                            text = "${item.date.format(DateTimeFormatter.ofPattern("MMM dd"))} • $timeStr",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+
+                    // Deadline Info for Tasks
+                    if (item is TimelineItem.Task && item.deadlineDate != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(
+                                    alpha = 0.6f
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Due ${item.deadlineDate.format(DateTimeFormatter.ofPattern("MMM dd"))}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(
+                                    alpha = 0.8f
+                                ),
+                                fontWeight = if (isMissed) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                 )
             }
         }
@@ -130,13 +274,13 @@ fun AddTaskDialog(
     var date by remember { mutableStateOf(LocalDate.now()) }
     var isAllDay by remember { mutableStateOf(false) }
     var startTime by remember { mutableStateOf(LocalTime.now()) }
+    var endTime by remember { mutableStateOf(LocalTime.now().plusHours(1)) }
     var deadlineDate by remember { mutableStateOf<LocalDate?>(null) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
 
-    // Date Picker
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
@@ -158,7 +302,6 @@ fun AddTaskDialog(
         }
     }
 
-    // Deadline Picker
     if (showDeadlinePicker) {
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = (deadlineDate
@@ -186,7 +329,6 @@ fun AddTaskDialog(
         }
     }
 
-    // Time Picker
     if (showTimePicker) {
         val timePickerState =
             rememberTimePickerState(initialHour = startTime.hour, initialMinute = startTime.minute)
@@ -207,6 +349,7 @@ fun AddTaskDialog(
                         TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
                         TextButton(onClick = {
                             startTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            endTime = startTime.plusHours(1)
                             showTimePicker = false
                         }) { Text("OK") }
                     }
@@ -243,37 +386,39 @@ fun AddTaskDialog(
                     Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
-                    Text("All day", style = MaterialTheme.typography.bodyMedium)
-                }
+                if (isEvent) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
+                        Text("All day", style = MaterialTheme.typography.bodyMedium)
+                    }
 
-                if (!isAllDay) {
-                    TextButton(onClick = { showTimePicker = true }) {
+                    if (!isAllDay) {
+                        TextButton(onClick = { showTimePicker = true }) {
+                            Icon(
+                                Icons.Default.AccessTime,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Time: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                        }
+                    }
+                } else {
+                    TextButton(onClick = { showDeadlinePicker = true }) {
                         Icon(
-                            Icons.Default.AccessTime,
+                            Icons.Default.Flag,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Time: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                        Text(
+                            if (deadlineDate == null) "Add Deadline" else "Deadline: ${
+                                deadlineDate?.format(
+                                    DateTimeFormatter.ofPattern("MMM dd, yyyy")
+                                )
+                            }"
+                        )
                     }
-                }
-
-                TextButton(onClick = { showDeadlinePicker = true }) {
-                    Icon(
-                        Icons.Default.Flag,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (deadlineDate == null) "Add Deadline" else "Deadline: ${
-                            deadlineDate?.format(
-                                DateTimeFormatter.ofPattern("MMM dd, yyyy")
-                            )
-                        }"
-                    )
                 }
             }
         },
@@ -281,17 +426,24 @@ fun AddTaskDialog(
             Button(
                 onClick = {
                     if (title.isNotBlank()) {
-                        onConfirm(
-                            TimelineItem(
+                        val item = if (isEvent) {
+                            TimelineItem.Event(
                                 title = title,
                                 details = details,
                                 date = date,
-                                isAllDay = isAllDay,
-                                startTime = if (isAllDay) null else startTime,
-                                deadlineDate = deadlineDate,
-                                isTask = !isEvent
+                                startTime = if (isAllDay) LocalTime.MIDNIGHT else startTime,
+                                endTime = if (isAllDay) LocalTime.MAX else endTime,
+                                isAllDay = isAllDay
                             )
-                        )
+                        } else {
+                            TimelineItem.Task(
+                                title = title,
+                                details = details,
+                                date = date,
+                                deadlineDate = deadlineDate
+                            )
+                        }
+                        onConfirm(item)
                     }
                 },
                 enabled = title.isNotBlank()
@@ -303,102 +455,4 @@ fun AddTaskDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
-}
-
-@Composable
-fun VaultTaskCard(
-    task: TimelineItem,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
-) {
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = 0.3f
-            ) else MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onToggle) {
-                Icon(
-                    imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
-                    contentDescription = "Toggle Task",
-                    tint = if (task.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                )
-            }
-
-            Column(modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp)) {
-                Text(
-                    text = task.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
-                    color = if (task.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-                )
-
-                if (task.details.isNotBlank()) {
-                    Text(
-                        text = task.details,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.outline
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (task.isAllDay) "All Day" else task.startTime?.format(
-                                DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
-                            ) ?: "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-
-                    task.deadlineDate?.let { deadline ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Flag,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Due ${deadline.format(DateTimeFormatter.ofPattern("MMM dd"))}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
 }

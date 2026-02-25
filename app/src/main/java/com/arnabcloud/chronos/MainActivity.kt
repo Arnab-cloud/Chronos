@@ -123,7 +123,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 // Speed Dial Menu
@@ -133,7 +133,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
                     exit = fadeOut() + shrinkVertically()
                 ) {
                     Column(
-                        horizontalAlignment = Alignment.End,
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ExtendedFloatingActionButton(

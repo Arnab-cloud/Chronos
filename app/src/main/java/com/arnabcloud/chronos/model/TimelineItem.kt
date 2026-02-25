@@ -4,14 +4,34 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
 
-data class TimelineItem(
-    val id: UUID = UUID.randomUUID(),
-    val title: String,
-    val details: String = "",
-    val date: LocalDate = LocalDate.now(),
-    val startTime: LocalTime? = null,
-    val isAllDay: Boolean = false,
-    val deadlineDate: LocalDate? = null,
-    val isTask: Boolean = true,
-    val isCompleted: Boolean = false
-)
+sealed class TimelineItem {
+    abstract val id: UUID
+    abstract val title: String
+    abstract val details: String
+    abstract val date: LocalDate
+
+    data class Task(
+        override val id: UUID = UUID.randomUUID(),
+        override val title: String,
+        override val details: String = "",
+        override val date: LocalDate = LocalDate.now(),
+        val deadlineDate: LocalDate? = null,
+        val isCompleted: Boolean = false,
+        val priority: Priority = Priority.MEDIUM
+    ) : TimelineItem() {
+        fun isMissed(): Boolean = !isCompleted && deadlineDate?.isBefore(LocalDate.now()) == true
+    }
+
+    data class Event(
+        override val id: UUID = UUID.randomUUID(),
+        override val title: String,
+        override val details: String = "",
+        override val date: LocalDate = LocalDate.now(),
+        val startTime: LocalTime,
+        val endTime: LocalTime,
+        val isAllDay: Boolean = false,
+        val location: String? = null
+    ) : TimelineItem()
+}
+
+enum class Priority { LOW, MEDIUM, HIGH }

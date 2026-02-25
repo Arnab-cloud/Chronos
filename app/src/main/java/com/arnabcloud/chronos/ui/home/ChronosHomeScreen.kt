@@ -24,18 +24,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoveUp
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
@@ -65,17 +62,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
@@ -88,12 +77,12 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
-
 const val HourSlotHeight = 100.0
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChronosHomeScreen(viewModel: ChronosViewModel) {
+    var selectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
     var multiSelectMode by rememberSaveable { mutableStateOf(false) }
     val selectedItems = remember { mutableStateListOf<UUID>() }
     var showMoveDialog by remember { mutableStateOf(false) }
@@ -105,9 +94,10 @@ fun ChronosHomeScreen(viewModel: ChronosViewModel) {
 
     if (showMoveDialog) {
         MoveItemsDialog(
-            onDismiss = { },
+            onDismiss = { showMoveDialog = false },
             onConfirm = { newDate ->
                 viewModel.moveItems(selectedItems.toList(), newDate)
+                showMoveDialog = false
                 onClearSelection()
             }
         )
@@ -119,13 +109,14 @@ fun ChronosHomeScreen(viewModel: ChronosViewModel) {
             .background(MaterialTheme.colorScheme.background)
     ) {
         DayPicker(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp)
+            selectedDate = selectedDate,
+            onDateSelected = { selectedDate = it },
+            modifier = Modifier.fillMaxWidth()
         )
         Timeline(
             modifier = Modifier.weight(1f),
-            items = viewModel.getItemsForDate(LocalDate.now()),
+            selectedDate = selectedDate,
+            items = viewModel.getItemsForDate(selectedDate),
             selectedItems = selectedItems,
             onItemClick = { item ->
                 if (multiSelectMode) {
@@ -195,11 +186,15 @@ fun MoveItemsDialog(onDismiss: () -> Unit, onConfirm: (LocalDate) -> Unit) {
 }
 
 @Composable
-fun DayPicker(modifier: Modifier = Modifier) {
+fun DayPicker(
+    selectedDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier
+) {
     val days = (0..14).map { LocalDate.now().plusDays(it.toLong()) }
     Column(modifier = modifier) {
         Text(
-            text = LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+            text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(start = 16.dp, top = 8.dp),
             fontWeight = FontWeight.Bold
@@ -212,28 +207,29 @@ fun DayPicker(modifier: Modifier = Modifier) {
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
             items(days) { day ->
-                val isToday = day == LocalDate.now()
+                val isSelected = day == selectedDate
                 Column(
                     modifier = Modifier
                         .width(55.dp)
                         .clip(MaterialTheme.shapes.large)
                         .background(
-                            if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
+                            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(
                                 alpha = 0.3f
                             )
                         )
+                        .clickable { onDateSelected(day) }
                         .padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = day.dayOfWeek.name.take(3),
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = day.dayOfMonth.toString(),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -245,6 +241,7 @@ fun DayPicker(modifier: Modifier = Modifier) {
 @Composable
 fun Timeline(
     modifier: Modifier = Modifier,
+    selectedDate: LocalDate,
     items: List<TimelineItem>,
     selectedItems: List<UUID>,
     onItemClick: (TimelineItem) -> Unit,
@@ -255,11 +252,15 @@ fun Timeline(
 ) {
     val hours = (0..23).toList()
     val scrollState = rememberScrollState()
-    var editingHour by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(Unit) {
-        val currentHour = LocalTime.now().hour
-        scrollState.scrollTo((currentHour * 100 * 2.5).toInt())
+    // Scroll to current hour only if today is selected
+    LaunchedEffect(selectedDate) {
+        if (selectedDate == LocalDate.now()) {
+            val currentHour = LocalTime.now().hour
+            scrollState.scrollTo((currentHour * HourSlotHeight * 2.5).toInt())
+        } else {
+            scrollState.scrollTo(0)
+        }
     }
 
     Box(modifier = modifier.verticalScroll(scrollState)) {
@@ -267,20 +268,23 @@ fun Timeline(
             hours.forEach { hour ->
                 HourSlot(
                     hour = hour,
-                    itemsInHour = items.filter { it.startTime?.hour == hour },
-                    isEditing = editingHour == hour,
-                    onStartEditing = { editingHour = hour },
-                    onStopEditing = { editingHour = null },
+                    itemsInHour = items.filter {
+                        when (it) {
+                            is TimelineItem.Event -> it.startTime.hour == hour
+                            is TimelineItem.Task -> it.date.atStartOfDay().hour == hour
+                        }
+                    },
                     selectedItems = selectedItems,
                     onItemClick = onItemClick,
                     onItemLongClick = onItemLongClick,
-                    onAddItem = onAddItem,
                     onRemoveItem = onRemoveItem,
                     onSetCompleted = onSetCompleted
                 )
             }
         }
-        NowLine()
+        if (selectedDate == LocalDate.now()) {
+            NowLine()
+        }
     }
 }
 
@@ -289,13 +293,9 @@ fun Timeline(
 fun HourSlot(
     hour: Int,
     itemsInHour: List<TimelineItem>,
-    isEditing: Boolean,
-    onStartEditing: () -> Unit,
-    onStopEditing: () -> Unit,
     selectedItems: List<UUID>,
     onItemClick: (TimelineItem) -> Unit,
     onItemLongClick: (TimelineItem) -> Unit,
-    onAddItem: (TimelineItem) -> Unit,
     onRemoveItem: (TimelineItem) -> Unit,
     onSetCompleted: (TimelineItem, Boolean) -> Unit
 ) {
@@ -342,81 +342,8 @@ fun HourSlot(
                         onSetCompleted = { completed -> onSetCompleted(item, completed) }
                     )
                 }
-
-                if (isEditing) {
-                    QuickAddTextField(
-                        onAdd = {
-                            onAddItem(TimelineItem(title = it, startTime = LocalTime.of(hour, 0)))
-                            onStopEditing()
-                        }
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(40.dp)
-                            .clickable(onClick = onStartEditing),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Quick Add",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
             }
         }
-    }
-}
-
-@Composable
-fun QuickAddTextField(onAdd: (String) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
-
-    BasicTextField(
-        value = text,
-        onValueChange = { text = it },
-        modifier = Modifier
-            .fillMaxWidth()
-            .focusRequester(focusRequester)
-            .onKeyEvent {
-                if (it.key == Key.Enter) {
-                    onAdd(text)
-                    true
-                } else {
-                    false
-                }
-            },
-        textStyle = TextStyle(
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = MaterialTheme.typography.bodyLarge.fontSize
-        ),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = {
-            onAdd(text)
-            keyboardController?.hide()
-        }),
-        decorationBox = { innerTextField ->
-            Box(modifier = Modifier.padding(vertical = 8.dp)) {
-                if (text.isEmpty()) {
-                    Text(
-                        "Quick Type a task...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                }
-                innerTextField()
-            }
-        }
-    )
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
     }
 }
 
@@ -435,7 +362,9 @@ fun SwipeableTaskCard(
         if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
             onRemove()
         } else if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
-            onSetCompleted(!item.isCompleted)
+            if (item is TimelineItem.Task) {
+                onSetCompleted(!item.isCompleted)
+            }
             dismissState.reset()
         }
     }
@@ -444,7 +373,7 @@ fun SwipeableTaskCard(
         state = dismissState,
         modifier = modifier,
         enableDismissFromEndToStart = true,
-        enableDismissFromStartToEnd = true,
+        enableDismissFromStartToEnd = item is TimelineItem.Task,
         backgroundContent = {
             val direction = dismissState.dismissDirection
             val color = when (direction) {
@@ -476,17 +405,20 @@ fun SwipeableTaskCard(
             }
         },
         content = {
-            if (item.isTask) {
-                TaskCard(item, isSelected) { onSetCompleted(!item.isCompleted) }
-            } else {
-                EventCard(item, isSelected)
+            when (item) {
+                is TimelineItem.Task -> TaskCard(
+                    item,
+                    isSelected
+                ) { onSetCompleted(!item.isCompleted) }
+
+                is TimelineItem.Event -> EventCard(item, isSelected)
             }
         }
     )
 }
 
 @Composable
-fun EventCard(item: TimelineItem, isSelected: Boolean, modifier: Modifier = Modifier) {
+fun EventCard(item: TimelineItem.Event, isSelected: Boolean, modifier: Modifier = Modifier) {
     ElevatedCard(
         modifier = modifier.border(
             border = if (isSelected) BorderStroke(
@@ -501,11 +433,17 @@ fun EventCard(item: TimelineItem, isSelected: Boolean, modifier: Modifier = Modi
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Badge(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) {
+                    Text("Event", style = MaterialTheme.typography.labelSmall)
+                }
+            }
             if (item.details.isNotBlank()) {
                 Text(
                     text = item.details,
@@ -513,13 +451,17 @@ fun EventCard(item: TimelineItem, isSelected: Boolean, modifier: Modifier = Modi
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
             }
-            val timeText = if (item.isAllDay) "All Day" else item.startTime?.format(
-                DateTimeFormatter.ofPattern("hh:mm a")
-            ) ?: ""
+            val timeText = if (item.isAllDay) "All Day" else "${
+                item.startTime.format(
+                    DateTimeFormatter.ofPattern("hh:mm a")
+                )
+            } - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
             Text(
                 text = timeText,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                    alpha = 0.8f
+                )
             )
         }
     }
@@ -527,18 +469,27 @@ fun EventCard(item: TimelineItem, isSelected: Boolean, modifier: Modifier = Modi
 
 @Composable
 fun TaskCard(
-    item: TimelineItem,
+    item: TimelineItem.Task,
     isSelected: Boolean,
     modifier: Modifier = Modifier,
     onToggleComplete: () -> Unit
 ) {
+    val isMissed = item.isMissed()
     Card(
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
-        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (isSelected) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else if (isMissed) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.error)
+        } else {
+            null
+        },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            containerColor = if (item.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.3f
+            ) else if (isMissed) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f) else MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSecondaryContainer
         )
     ) {
         Row(
@@ -551,19 +502,29 @@ fun TaskCard(
                 Icon(
                     imageVector = if (item.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
                     contentDescription = "Complete",
-                    tint = if (item.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                    tint = if (item.isCompleted) MaterialTheme.colorScheme.primary else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
             Column {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isMissed && !item.isCompleted) FontWeight.Bold else FontWeight.Normal,
+                    textDecoration = if (item.isCompleted) TextDecoration.LineThrough else null,
                     modifier = Modifier.padding(start = 8.dp)
                 )
                 if (item.details.isNotBlank()) {
                     Text(
                         text = item.details,
                         style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+                if (isMissed && !item.isCompleted) {
+                    Text(
+                        text = "Missed Deadline",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
