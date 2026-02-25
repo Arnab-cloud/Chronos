@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -81,7 +80,7 @@ const val HourSlotHeight = 100.0
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ChronosHomeScreen(viewModel: ChronosViewModel) {
+fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
     var selectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
     var multiSelectMode by rememberSaveable { mutableStateOf(false) }
     val selectedItems = remember { mutableStateListOf<UUID>() }

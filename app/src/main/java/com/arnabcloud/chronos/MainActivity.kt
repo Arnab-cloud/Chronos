@@ -46,7 +46,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.arnabcloud.chronos.ui.calendar.ChronosCalendarScreen
-import com.arnabcloud.chronos.ui.home.ChronosHomeScreen
+import com.arnabcloud.chronos.ui.home.ChronosTimelineScreen
 import com.arnabcloud.chronos.ui.theme.ChronosTheme
 import com.arnabcloud.chronos.ui.vault.AddTaskDialog
 import com.arnabcloud.chronos.ui.vault.ChronosVaultScreen
@@ -182,7 +182,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Vault.route) { ChronosVaultScreen(viewModel) }
-            composable(Screen.Timeline.route) { ChronosHomeScreen(viewModel) }
+            composable(Screen.Timeline.route) { ChronosTimelineScreen(viewModel) }
             composable(Screen.Calendar.route) { ChronosCalendarScreen(viewModel) }
         }
     }
