@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
@@ -62,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -69,6 +71,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -313,32 +316,46 @@ fun ItemDetailDialog(
     onSave: (TimelineItem) -> Unit
 ) {
     var isEditing by remember { mutableStateOf(false) }
-    
+
     // Editable state
     var editedTitle by remember { mutableStateOf(item.title) }
     var editedDetails by remember { mutableStateOf(item.details) }
     var editedDate by remember { mutableStateOf(item.date) }
     var editedStartTime by remember { mutableStateOf(if (item is TimelineItem.Event) item.startTime else LocalTime.now()) }
-    var editedEndTime by remember { mutableStateOf(if (item is TimelineItem.Event) item.endTime else LocalTime.now().plusHours(1)) }
+    var editedEndTime by remember {
+        mutableStateOf(
+            if (item is TimelineItem.Event) item.endTime else LocalTime.now().plusHours(1)
+        )
+    }
     var editedIsAllDay by remember { mutableStateOf(if (item is TimelineItem.Event) item.isAllDay else false) }
-    var editedLocation by remember { mutableStateOf(if (item is TimelineItem.Event) item.location ?: "" else "") }
+    var editedLocation by remember {
+        mutableStateOf(
+            if (item is TimelineItem.Event) item.location ?: "" else ""
+        )
+    }
     var editedDeadlineDate by remember { mutableStateOf(if (item is TimelineItem.Task) item.deadlineDate else null) }
     var editedPriority by remember { mutableStateOf(if (item is TimelineItem.Task) item.priority else Priority.MEDIUM) }
 
+    var isDurationMode by remember { mutableStateOf(false) }
+
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+    var showDurationPicker by remember { mutableStateOf(false) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = editedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            initialSelectedDateMillis = editedDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                .toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        editedDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        editedDate =
+                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
                     }
                     showDatePicker = false
                 }) { Text("OK") }
@@ -351,14 +368,16 @@ fun ItemDetailDialog(
 
     if (showDeadlinePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = (editedDeadlineDate ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            initialSelectedDateMillis = (editedDeadlineDate
+                ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showDeadlinePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        editedDeadlineDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                        editedDeadlineDate =
+                            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
                     }
                     showDeadlinePicker = false
                 }) { Text("OK") }
@@ -374,23 +393,78 @@ fun ItemDetailDialog(
         }
     }
 
-    if (showTimePicker) {
-        val timePickerState = rememberTimePickerState(initialHour = editedStartTime.hour, initialMinute = editedStartTime.minute)
-        Dialog(onDismissRequest = { showTimePicker = false }) {
+    if (showStartTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = editedStartTime.hour,
+            initialMinute = editedStartTime.minute
+        )
+        Dialog(onDismissRequest = { showStartTimePicker = false }) {
             Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
-                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     TimePicker(state = timePickerState)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showStartTimePicker = false }) { Text("Cancel") }
                         TextButton(onClick = {
-                            editedStartTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                            editedEndTime = editedStartTime.plusHours(1)
-                            showTimePicker = false
+                            val newStart =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            if (isDurationMode) {
+                                val duration = Duration.between(editedStartTime, editedEndTime)
+                                editedStartTime = newStart
+                                editedEndTime = editedStartTime.plus(duration)
+                            } else {
+                                editedStartTime = newStart
+                            }
+                            showStartTimePicker = false
                         }) { Text("OK") }
                     }
                 }
             }
         }
+    }
+
+    if (showEndTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = editedEndTime.hour,
+            initialMinute = editedEndTime.minute
+        )
+        Dialog(onDismissRequest = { showEndTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showEndTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            editedEndTime =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showEndTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDurationPicker) {
+        DurationPickerDialog(
+            initialDuration = Duration.between(editedStartTime, editedEndTime),
+            onDismiss = { showDurationPicker = false },
+            onConfirm = { duration ->
+                editedEndTime = editedStartTime.plus(duration)
+                showDurationPicker = false
+            }
+        )
     }
 
     Dialog(
@@ -444,10 +518,9 @@ fun ItemDetailDialog(
                             )
                         }
                     }
-                    
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isEditing) {
-                            // Clear 'Discard' action using a TextButton to differentiate from Dialog Close
                             TextButton(
                                 onClick = {
                                     // Discard changes and revert state
@@ -469,7 +542,6 @@ fun ItemDetailDialog(
                             ) {
                                 Text("Discard", color = MaterialTheme.colorScheme.error)
                             }
-                            // Show a checkmark for saving in the header too for convenience
                             IconButton(
                                 onClick = {
                                     val updatedItem = when (item) {
@@ -477,11 +549,12 @@ fun ItemDetailDialog(
                                             title = editedTitle,
                                             details = editedDetails,
                                             date = editedDate,
-                                            startTime = editedStartTime,
-                                            endTime = editedEndTime,
+                                            startTime = if (editedIsAllDay) LocalTime.MIDNIGHT else editedStartTime,
+                                            endTime = if (editedIsAllDay) LocalTime.MAX else editedEndTime,
                                             isAllDay = editedIsAllDay,
                                             location = editedLocation.ifBlank { null }
                                         )
+
                                         is TimelineItem.Task -> item.copy(
                                             title = editedTitle,
                                             details = editedDetails,
@@ -493,7 +566,11 @@ fun ItemDetailDialog(
                                     onSave(updatedItem)
                                 }
                             ) {
-                                Icon(Icons.Default.Check, contentDescription = "Save Changes", tint = MaterialTheme.colorScheme.primary)
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Save Changes",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
                         } else {
                             IconButton(onClick = { isEditing = true }) {
@@ -523,14 +600,20 @@ fun ItemDetailDialog(
                         value = editedTitle,
                         onValueChange = { editedTitle = it },
                         label = { Text("Title") },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
                     )
                 }
 
                 // Date and Time Info
                 if (isEditing) {
                     TextButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
                     }
@@ -545,29 +628,111 @@ fun ItemDetailDialog(
                 if (item is TimelineItem.Event) {
                     if (isEditing) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = editedIsAllDay, onCheckedChange = { editedIsAllDay = it })
+                            Checkbox(
+                                checked = editedIsAllDay,
+                                onCheckedChange = { editedIsAllDay = it })
                             Text("All day", style = MaterialTheme.typography.bodyMedium)
                         }
                         if (!editedIsAllDay) {
-                            TextButton(onClick = { showTimePicker = true }) {
-                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Time: ${editedStartTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                TextButton(onClick = { showStartTimePicker = true }) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Start: ${
+                                            editedStartTime.format(
+                                                DateTimeFormatter.ofPattern(
+                                                    "hh:mm a"
+                                                )
+                                            )
+                                        }"
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = !isDurationMode,
+                                        onClick = { isDurationMode = false },
+                                        label = { Text("End Time") }
+                                    )
+                                    FilterChip(
+                                        selected = isDurationMode,
+                                        onClick = { isDurationMode = true },
+                                        label = { Text("Duration") }
+                                    )
+                                }
+
+                                if (isDurationMode) {
+                                    TextButton(onClick = { showDurationPicker = true }) {
+                                        Icon(
+                                            Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Duration: ${
+                                                formatDuration(
+                                                    Duration.between(
+                                                        editedStartTime,
+                                                        editedEndTime
+                                                    )
+                                                )
+                                            }"
+                                        )
+                                    }
+                                } else {
+                                    TextButton(onClick = { showEndTimePicker = true }) {
+                                        Icon(
+                                            Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "End: ${
+                                                editedEndTime.format(
+                                                    DateTimeFormatter.ofPattern(
+                                                        "hh:mm a"
+                                                    )
+                                                )
+                                            }"
+                                        )
+                                    }
+                                }
                             }
                         }
                         OutlinedTextField(
                             value = editedLocation,
                             onValueChange = { editedLocation = it },
                             label = { Text("Location") },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
                         )
                     } else {
                         val timeRange = if (item.isAllDay) "All Day" else {
-                            "${item.startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))} - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
+                            "${item.startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))} - ${
+                                item.endTime.format(
+                                    DateTimeFormatter.ofPattern("hh:mm a")
+                                )
+                            }"
                         }
-                        DetailRow(icon = Icons.Default.AccessTime, label = "Time", value = timeRange)
+                        DetailRow(
+                            icon = Icons.Default.AccessTime,
+                            label = "Time",
+                            value = timeRange
+                        )
                         item.location?.let {
-                            if (it.isNotBlank()) DetailRow(icon = Icons.Default.LocationOn, label = "Location", value = it)
+                            if (it.isNotBlank()) DetailRow(
+                                icon = Icons.Default.LocationOn,
+                                label = "Location",
+                                value = it
+                            )
                         }
                     }
                 }
@@ -575,12 +740,27 @@ fun ItemDetailDialog(
                 if (item is TimelineItem.Task) {
                     if (isEditing) {
                         TextButton(onClick = { showDeadlinePicker = true }) {
-                            Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (editedDeadlineDate == null) "Add Deadline" else "Deadline: ${editedDeadlineDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                            Text(
+                                if (editedDeadlineDate == null) "Add Deadline" else "Deadline: ${
+                                    editedDeadlineDate?.format(
+                                        DateTimeFormatter.ofPattern("MMM dd, yyyy")
+                                    )
+                                }"
+                            )
                         }
-                        
-                        Text("Priority", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 8.dp))
+
+                        Text(
+                            "Priority",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Priority.entries.forEach { priority ->
                                 FilterChip(
@@ -588,7 +768,13 @@ fun ItemDetailDialog(
                                     onClick = { editedPriority = priority },
                                     label = { Text(priority.name) },
                                     leadingIcon = if (editedPriority == priority) {
-                                        { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     } else null
                                 )
                             }
@@ -602,7 +788,11 @@ fun ItemDetailDialog(
                                 color = if (item.isMissed()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         }
-                        DetailRow(icon = Icons.Default.PriorityHigh, label = "Priority", value = item.priority.name)
+                        DetailRow(
+                            icon = Icons.Default.PriorityHigh,
+                            label = "Priority",
+                            value = item.priority.name
+                        )
                     }
                 }
 
@@ -625,8 +815,16 @@ fun ItemDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(text = "Description", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                            Text(text = item.details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = "Description",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = item.details,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -645,11 +843,12 @@ fun ItemDetailDialog(
                                         title = editedTitle,
                                         details = editedDetails,
                                         date = editedDate,
-                                        startTime = editedStartTime,
-                                        endTime = editedEndTime,
+                                        startTime = if (editedIsAllDay) LocalTime.MIDNIGHT else editedStartTime,
+                                        endTime = if (editedIsAllDay) LocalTime.MAX else editedEndTime,
                                         isAllDay = editedIsAllDay,
                                         location = editedLocation.ifBlank { null }
                                     )
+
                                     is TimelineItem.Task -> item.copy(
                                         title = editedTitle,
                                         details = editedDetails,
@@ -663,7 +862,11 @@ fun ItemDetailDialog(
                             modifier = Modifier.weight(1f),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Save Changes")
                         }
@@ -677,13 +880,17 @@ fun ItemDetailDialog(
                                 Text(if (item.isCompleted) "Mark as Active" else "Mark as Done")
                             }
                         }
-                        
+
                         TextButton(
                             onClick = onDelete,
                             modifier = Modifier.weight(if (item is TimelineItem.Task) 0.5f else 1f),
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Delete")
                         }
@@ -692,6 +899,63 @@ fun ItemDetailDialog(
             }
         }
     }
+}
+
+@Composable
+fun DurationPickerDialog(
+    initialDuration: Duration,
+    onDismiss: () -> Unit,
+    onConfirm: (Duration) -> Unit
+) {
+    var hours by remember { mutableStateOf(initialDuration.toHours().toString()) }
+    var minutes by remember { mutableStateOf((initialDuration.toMinutes() % 60).toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set Duration") },
+        text = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = hours,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) hours = it },
+                    label = { Text("Hours") },
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Text(":", style = MaterialTheme.typography.headlineMedium)
+                OutlinedTextField(
+                    value = minutes,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) minutes = it },
+                    label = { Text("Minutes") },
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val h = hours.toLongOrNull() ?: 0L
+                val m = minutes.toLongOrNull() ?: 0L
+                onConfirm(Duration.ofHours(h).plusMinutes(m))
+            }) { Text("Confirm") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+private fun formatDuration(duration: Duration): String {
+    val h = duration.toHours()
+    val m = duration.toMinutes() % 60
+    return buildString {
+        if (h > 0) append("${h}h ")
+        if (m > 0 || h == 0L) append("${m}m")
+    }.trim()
 }
 
 @Composable
@@ -744,8 +1008,12 @@ fun AddTaskDialog(
     var endTime by remember { mutableStateOf(LocalTime.now().plusHours(1)) }
     var deadlineDate by remember { mutableStateOf<LocalDate?>(null) }
 
+    var isDurationMode by remember { mutableStateOf(false) }
+
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
+    var showDurationPicker by remember { mutableStateOf(false) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
@@ -796,13 +1064,10 @@ fun AddTaskDialog(
         }
     }
 
-    if (showTimePicker) {
+    if (showStartTimePicker) {
         val timePickerState =
             rememberTimePickerState(initialHour = startTime.hour, initialMinute = startTime.minute)
-        Dialog(
-            onDismissRequest = { showTimePicker = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
+        Dialog(onDismissRequest = { showStartTimePicker = false }) {
             Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -813,16 +1078,59 @@ fun AddTaskDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = { showStartTimePicker = false }) { Text("Cancel") }
                         TextButton(onClick = {
-                            startTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                            endTime = startTime.plusHours(1)
-                            showTimePicker = false
+                            val newStart =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            if (isDurationMode) {
+                                val duration = Duration.between(startTime, endTime)
+                                startTime = newStart
+                                endTime = startTime.plus(duration)
+                            } else {
+                                startTime = newStart
+                            }
+                            showStartTimePicker = false
                         }) { Text("OK") }
                     }
                 }
             }
         }
+    }
+
+    if (showEndTimePicker) {
+        val timePickerState =
+            rememberTimePickerState(initialHour = endTime.hour, initialMinute = endTime.minute)
+        Dialog(onDismissRequest = { showEndTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showEndTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            endTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showEndTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDurationPicker) {
+        DurationPickerDialog(
+            initialDuration = Duration.between(startTime, endTime),
+            onDismiss = { showDurationPicker = false },
+            onConfirm = { duration ->
+                endTime = startTime.plus(duration)
+                showDurationPicker = false
+            }
+        )
     }
 
     AlertDialog(
@@ -860,14 +1168,60 @@ fun AddTaskDialog(
                     }
 
                     if (!isAllDay) {
-                        TextButton(onClick = { showTimePicker = true }) {
-                            Icon(
-                                Icons.Default.AccessTime,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Time: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            TextButton(onClick = { showStartTimePicker = true }) {
+                                Icon(
+                                    Icons.Default.AccessTime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Start: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = !isDurationMode,
+                                    onClick = { isDurationMode = false },
+                                    label = { Text("End Time") }
+                                )
+                                FilterChip(
+                                    selected = isDurationMode,
+                                    onClick = { isDurationMode = true },
+                                    label = { Text("Duration") }
+                                )
+                            }
+
+                            if (isDurationMode) {
+                                TextButton(onClick = { showDurationPicker = true }) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Duration: ${
+                                            formatDuration(
+                                                Duration.between(
+                                                    startTime,
+                                                    endTime
+                                                )
+                                            )
+                                        }"
+                                    )
+                                }
+                            } else {
+                                TextButton(onClick = { showEndTimePicker = true }) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("End: ${endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                }
+                            }
                         }
                     }
                 } else {
