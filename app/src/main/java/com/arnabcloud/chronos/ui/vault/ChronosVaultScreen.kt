@@ -260,7 +260,10 @@ fun VaultItemCard(
                                 DateTimeFormatter.ofPattern("hh:mm a")
                             )
 
-                            is TimelineItem.Task -> "Task"
+                            is TimelineItem.Task -> {
+                                item.taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                                    ?: "Task"
+                            }
                         }
                         Text(
                             text = "${item.date.format(DateTimeFormatter.ofPattern("MMM dd"))} • $timeStr",
@@ -281,8 +284,15 @@ fun VaultItemCard(
                                 )
                             )
                             Spacer(modifier = Modifier.width(4.dp))
+                            val deadlineTimeStr = item.deadlineTime?.let {
+                                " at ${
+                                    it.format(
+                                        DateTimeFormatter.ofPattern("hh:mm a")
+                                    )
+                                }"
+                            } ?: ""
                             Text(
-                                text = "Due ${item.deadlineDate.format(DateTimeFormatter.ofPattern("MMM dd"))}",
+                                text = "Due ${item.deadlineDate.format(DateTimeFormatter.ofPattern("MMM dd"))}$deadlineTimeStr",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(
                                     alpha = 0.8f
@@ -334,6 +344,8 @@ fun ItemDetailDialog(
     }
     var editedDeadlineDate by remember { mutableStateOf(if (item is TimelineItem.Task) item.deadlineDate else null) }
     var editedPriority by remember { mutableStateOf(if (item is TimelineItem.Task) item.priority else Priority.MEDIUM) }
+    var editedTaskTime by remember { mutableStateOf(if (item is TimelineItem.Task) item.taskTime else null) }
+    var editedDeadlineTime by remember { mutableStateOf(if (item is TimelineItem.Task) item.deadlineTime else null) }
 
     var isDurationMode by remember { mutableStateOf(false) }
 
@@ -342,6 +354,8 @@ fun ItemDetailDialog(
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showDurationPicker by remember { mutableStateOf(false) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
+    var showTaskTimePicker by remember { mutableStateOf(false) }
+    var showDeadlineTimePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -398,7 +412,7 @@ fun ItemDetailDialog(
             initialMinute = editedStartTime.minute
         )
         Dialog(onDismissRequest = { showStartTimePicker = false }) {
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -433,7 +447,7 @@ fun ItemDetailDialog(
             initialMinute = editedEndTime.minute
         )
         Dialog(onDismissRequest = { showEndTimePicker = false }) {
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -448,6 +462,70 @@ fun ItemDetailDialog(
                             editedEndTime =
                                 LocalTime.of(timePickerState.hour, timePickerState.minute)
                             showEndTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTaskTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = editedTaskTime?.hour ?: LocalTime.now().hour,
+            initialMinute = editedTaskTime?.minute ?: LocalTime.now().minute
+        )
+        Dialog(onDismissRequest = { showTaskTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = {
+                            editedTaskTime = null
+                            showTaskTimePicker = false
+                        }) { Text("Clear") }
+                        TextButton(onClick = { showTaskTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            editedTaskTime =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showTaskTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeadlineTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = editedDeadlineTime?.hour ?: LocalTime.now().hour,
+            initialMinute = editedDeadlineTime?.minute ?: LocalTime.now().minute
+        )
+        Dialog(onDismissRequest = { showDeadlineTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = {
+                            editedDeadlineTime = null
+                            showDeadlineTimePicker = false
+                        }) { Text("Clear") }
+                        TextButton(onClick = { showDeadlineTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            editedDeadlineTime =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showDeadlineTimePicker = false
                         }) { Text("OK") }
                     }
                 }
@@ -536,6 +614,8 @@ fun ItemDetailDialog(
                                     if (item is TimelineItem.Task) {
                                         editedDeadlineDate = item.deadlineDate
                                         editedPriority = item.priority
+                                        editedTaskTime = item.taskTime
+                                        editedDeadlineTime = item.deadlineTime
                                     }
                                     isEditing = false
                                 }
@@ -560,7 +640,9 @@ fun ItemDetailDialog(
                                             title = editedTitle,
                                             details = editedDetails,
                                             date = editedDate,
+                                            taskTime = editedTaskTime,
                                             deadlineDate = editedDeadlineDate,
+                                            deadlineTime = editedDeadlineTime,
                                             priority = editedPriority
                                         )
                                     }
@@ -610,14 +692,33 @@ fun ItemDetailDialog(
 
                 // Date and Time Info
                 if (isEditing) {
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Icon(
-                            Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                    Row {
+                        TextButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                        }
+                        if (item is TimelineItem.Task) {
+                            TextButton(
+                                onClick = { showTaskTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.AccessTime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Time: ${editedTaskTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                            }
+                        }
                     }
                 } else {
                     DetailRow(
@@ -625,6 +726,13 @@ fun ItemDetailDialog(
                         label = "Date",
                         value = item.date.format(DateTimeFormatter.ofPattern("EEEE, MMM dd, yyyy"))
                     )
+                    if (item is TimelineItem.Task && item.taskTime != null) {
+                        DetailRow(
+                            icon = Icons.Default.AccessTime,
+                            label = "Time",
+                            value = item.taskTime.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                        )
+                    }
                 }
 
                 if (item is TimelineItem.Event) {
@@ -741,20 +849,47 @@ fun ItemDetailDialog(
 
                 if (item is TimelineItem.Task) {
                     if (isEditing) {
-                        TextButton(onClick = { showDeadlinePicker = true }) {
-                            Icon(
-                                Icons.Default.Flag,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (editedDeadlineDate == null) "Add Deadline" else "Deadline: ${
-                                    editedDeadlineDate?.format(
-                                        DateTimeFormatter.ofPattern("MMM dd, yyyy")
+                        Row {
+                            TextButton(
+                                onClick = { showDeadlinePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    if (editedDeadlineDate == null) "Add Deadline" else "Due: ${
+                                        editedDeadlineDate?.format(
+                                            DateTimeFormatter.ofPattern("MMM dd")
+                                        )
+                                    }"
+                                )
+                            }
+                            if (editedDeadlineDate != null) {
+                                TextButton(
+                                    onClick = { showDeadlineTimePicker = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                }"
-                            )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "at ${
+                                            editedDeadlineTime?.format(
+                                                DateTimeFormatter.ofPattern(
+                                                    "hh:mm a"
+                                                )
+                                            ) ?: "None"
+                                        }"
+                                    )
+                                }
+                            }
                         }
 
                         Text(
@@ -783,10 +918,17 @@ fun ItemDetailDialog(
                         }
                     } else {
                         item.deadlineDate?.let {
+                            val timeStr = item.deadlineTime?.let {
+                                " at ${
+                                    it.format(
+                                        DateTimeFormatter.ofPattern("hh:mm a")
+                                    )
+                                }"
+                            } ?: ""
                             DetailRow(
                                 icon = Icons.Default.Flag,
                                 label = "Deadline",
-                                value = it.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
+                                value = "${it.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}$timeStr",
                                 color = if (item.isMissed()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -855,7 +997,9 @@ fun ItemDetailDialog(
                                         title = editedTitle,
                                         details = editedDetails,
                                         date = editedDate,
+                                        taskTime = editedTaskTime,
                                         deadlineDate = editedDeadlineDate,
+                                        deadlineTime = editedDeadlineTime,
                                         priority = editedPriority
                                     )
                                 }
@@ -935,9 +1079,9 @@ fun DurationPickerDialog(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1044,6 +1188,8 @@ fun AddTaskDialog(
     var endTime by remember { mutableStateOf(LocalTime.now().plusHours(1)) }
     var deadlineDate by remember { mutableStateOf<LocalDate?>(null) }
     var priority by remember { mutableStateOf(Priority.MEDIUM) }
+    var taskTime by remember { mutableStateOf<LocalTime?>(null) }
+    var deadlineTime by remember { mutableStateOf<LocalTime?>(null) }
 
     var isDurationMode by remember { mutableStateOf(false) }
 
@@ -1052,6 +1198,8 @@ fun AddTaskDialog(
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showDurationPicker by remember { mutableStateOf(false) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
+    var showTaskTimePicker by remember { mutableStateOf(false) }
+    var showDeadlineTimePicker by remember { mutableStateOf(false) }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -1105,12 +1253,12 @@ fun AddTaskDialog(
         val timePickerState =
             rememberTimePickerState(initialHour = startTime.hour, initialMinute = startTime.minute)
         Dialog(onDismissRequest = { showStartTimePicker = false }) {
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    TimePicker(state = timePickerState)
+                    TimePicker(state = timePickerState, modifier = Modifier.fillMaxWidth())
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
@@ -1138,7 +1286,7 @@ fun AddTaskDialog(
         val timePickerState =
             rememberTimePickerState(initialHour = endTime.hour, initialMinute = endTime.minute)
         Dialog(onDismissRequest = { showEndTimePicker = false }) {
-            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
                 Column(
                     modifier = Modifier.padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1152,6 +1300,71 @@ fun AddTaskDialog(
                         TextButton(onClick = {
                             endTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
                             showEndTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showTaskTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = taskTime?.hour ?: LocalTime.now().hour,
+            initialMinute = taskTime?.minute ?: LocalTime.now().minute
+        )
+        Dialog(onDismissRequest = { showTaskTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = {
+                            taskTime = null
+                            showTaskTimePicker = false
+                        }) { Text("Clear") }
+                        TextButton(onClick = { showTaskTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            taskTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showTaskTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showDeadlineTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = deadlineTime?.hour ?: LocalTime.now().hour,
+            initialMinute = deadlineTime?.minute ?: LocalTime.now().minute
+        )
+        Dialog(onDismissRequest = { showDeadlineTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = {
+                            deadlineTime = null
+                            showDeadlineTimePicker = false
+                        }) { Text("Clear") }
+                        TextButton(onClick = { showDeadlineTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            deadlineTime =
+                                LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            showDeadlineTimePicker = false
                         }) { Text("OK") }
                     }
                 }
@@ -1235,14 +1448,33 @@ fun AddTaskDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    TextButton(onClick = { showDatePicker = true }) {
-                        Icon(
-                            Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                    Row {
+                        TextButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                        }
+                        if (!isEvent) {
+                            TextButton(
+                                onClick = { showTaskTimePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.AccessTime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Time: ${taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                            }
+                        }
                     }
 
                     if (isEvent) {
@@ -1309,22 +1541,41 @@ fun AddTaskDialog(
                             }
                         }
                     } else {
-                        TextButton(onClick = { showDeadlinePicker = true }) {
-                            Icon(
-                                Icons.Default.Flag,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                if (deadlineDate == null) "Add Deadline" else "Deadline: ${
-                                    deadlineDate?.format(
-                                        DateTimeFormatter.ofPattern("MMM dd, yyyy")
+                        Row {
+                            TextButton(
+                                onClick = { showDeadlinePicker = true },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    if (deadlineDate == null) "Add Deadline" else "Due: ${
+                                        deadlineDate?.format(
+                                            DateTimeFormatter.ofPattern("MMM dd")
+                                        )
+                                    }"
+                                )
+                            }
+                            if (deadlineDate != null) {
+                                TextButton(
+                                    onClick = { showDeadlineTimePicker = true },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                }"
-                            )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("at ${deadlineTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                                }
+                            }
                         }
-                        
+
                         Text(
                             "Priority",
                             style = MaterialTheme.typography.labelMedium,
@@ -1381,7 +1632,9 @@ fun AddTaskDialog(
                                         title = title,
                                         details = details,
                                         date = date,
+                                        taskTime = taskTime,
                                         deadlineDate = deadlineDate,
+                                        deadlineTime = deadlineTime,
                                         priority = priority
                                     )
                                 }
@@ -1392,7 +1645,11 @@ fun AddTaskDialog(
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Save")
                     }

@@ -15,7 +15,9 @@ sealed class TimelineItem {
         override val title: String,
         override val details: String = "",
         override val date: LocalDate = LocalDate.now(),
+        val taskTime: LocalTime? = null,
         val deadlineDate: LocalDate? = null,
+        val deadlineTime: LocalTime? = null,
         val isCompleted: Boolean = false,
         val priority: Priority = Priority.MEDIUM
     ) : TimelineItem() {
