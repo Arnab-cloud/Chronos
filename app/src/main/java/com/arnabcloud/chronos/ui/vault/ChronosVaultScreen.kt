@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +21,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PriorityHigh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -35,6 +40,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,6 +66,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 import java.time.Instant
@@ -138,6 +145,10 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
             },
             onToggleTask = {
                 viewModel.toggleComplete(item)
+                selectedItem = null
+            },
+            onSave = { updatedItem ->
+                viewModel.updateItem(updatedItem)
                 selectedItem = null
             }
         )
@@ -292,13 +303,96 @@ fun VaultItemCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ItemDetailDialog(
     item: TimelineItem,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
-    onToggleTask: () -> Unit
+    onToggleTask: () -> Unit,
+    onSave: (TimelineItem) -> Unit
 ) {
+    var isEditing by remember { mutableStateOf(false) }
+    
+    // Editable state
+    var editedTitle by remember { mutableStateOf(item.title) }
+    var editedDetails by remember { mutableStateOf(item.details) }
+    var editedDate by remember { mutableStateOf(item.date) }
+    var editedStartTime by remember { mutableStateOf(if (item is TimelineItem.Event) item.startTime else LocalTime.now()) }
+    var editedEndTime by remember { mutableStateOf(if (item is TimelineItem.Event) item.endTime else LocalTime.now().plusHours(1)) }
+    var editedIsAllDay by remember { mutableStateOf(if (item is TimelineItem.Event) item.isAllDay else false) }
+    var editedLocation by remember { mutableStateOf(if (item is TimelineItem.Event) item.location ?: "" else "") }
+    var editedDeadlineDate by remember { mutableStateOf(if (item is TimelineItem.Task) item.deadlineDate else null) }
+    var editedPriority by remember { mutableStateOf(if (item is TimelineItem.Task) item.priority else Priority.MEDIUM) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showDeadlinePicker by remember { mutableStateOf(false) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = editedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        editedDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showDeadlinePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = (editedDeadlineDate ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDeadlinePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        editedDeadlineDate = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                    }
+                    showDeadlinePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    editedDeadlineDate = null
+                    showDeadlinePicker = false
+                }) { Text("Clear") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(initialHour = editedStartTime.hour, initialMinute = editedStartTime.minute)
+        Dialog(onDismissRequest = { showTimePicker = false }) {
+            Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.padding(24.dp)) {
+                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    TimePicker(state = timePickerState)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                        TextButton(onClick = {
+                            editedStartTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            editedEndTime = editedStartTime.plusHours(1)
+                            showTimePicker = false
+                        }) { Text("OK") }
+                    }
+                }
+            }
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -316,10 +410,11 @@ fun ItemDetailDialog(
                     .padding(24.dp)
                     .fillMaxWidth()
             ) {
+                // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Badge(
@@ -332,16 +427,89 @@ fun ItemDetailDialog(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        if (isEditing) {
+                            Text(
+                                text = "Editing Details",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        } else {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isEditing) {
+                            // Clear 'Discard' action using a TextButton to differentiate from Dialog Close
+                            TextButton(
+                                onClick = {
+                                    // Discard changes and revert state
+                                    editedTitle = item.title
+                                    editedDetails = item.details
+                                    editedDate = item.date
+                                    if (item is TimelineItem.Event) {
+                                        editedStartTime = item.startTime
+                                        editedEndTime = item.endTime
+                                        editedIsAllDay = item.isAllDay
+                                        editedLocation = item.location ?: ""
+                                    }
+                                    if (item is TimelineItem.Task) {
+                                        editedDeadlineDate = item.deadlineDate
+                                        editedPriority = item.priority
+                                    }
+                                    isEditing = false
+                                }
+                            ) {
+                                Text("Discard", color = MaterialTheme.colorScheme.error)
+                            }
+                            // Show a checkmark for saving in the header too for convenience
+                            IconButton(
+                                onClick = {
+                                    val updatedItem = when (item) {
+                                        is TimelineItem.Event -> item.copy(
+                                            title = editedTitle,
+                                            details = editedDetails,
+                                            date = editedDate,
+                                            startTime = editedStartTime,
+                                            endTime = editedEndTime,
+                                            isAllDay = editedIsAllDay,
+                                            location = editedLocation.ifBlank { null }
+                                        )
+                                        is TimelineItem.Task -> item.copy(
+                                            title = editedTitle,
+                                            details = editedDetails,
+                                            date = editedDate,
+                                            deadlineDate = editedDeadlineDate,
+                                            priority = editedPriority
+                                        )
+                                    }
+                                    onSave(updatedItem)
+                                }
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = "Save Changes", tint = MaterialTheme.colorScheme.primary)
+                            }
+                        } else {
+                            IconButton(onClick = { isEditing = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit Item",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            IconButton(onClick = onDismiss) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close Dialog"
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -349,52 +517,105 @@ fun ItemDetailDialog(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Editable Fields / View Fields
+                if (isEditing) {
+                    OutlinedTextField(
+                        value = editedTitle,
+                        onValueChange = { editedTitle = it },
+                        label = { Text("Title") },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
+                }
+
                 // Date and Time Info
-                DetailRow(
-                    icon = Icons.Default.CalendarToday,
-                    label = "Date",
-                    value = item.date.format(DateTimeFormatter.ofPattern("EEEE, MMM dd, yyyy"))
-                )
+                if (isEditing) {
+                    TextButton(onClick = { showDatePicker = true }) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                    }
+                } else {
+                    DetailRow(
+                        icon = Icons.Default.CalendarToday,
+                        label = "Date",
+                        value = item.date.format(DateTimeFormatter.ofPattern("EEEE, MMM dd, yyyy"))
+                    )
+                }
 
                 if (item is TimelineItem.Event) {
-                    val timeRange = if (item.isAllDay) "All Day" else {
-                        "${item.startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))} - ${
-                            item.endTime.format(
-                                DateTimeFormatter.ofPattern("hh:mm a")
-                            )
-                        }"
-                    }
-                    DetailRow(icon = Icons.Default.AccessTime, label = "Time", value = timeRange)
-
-                    item.location?.let {
-                        if (it.isNotBlank()) {
-                            DetailRow(
-                                icon = Icons.Default.LocationOn,
-                                label = "Location",
-                                value = it
-                            )
+                    if (isEditing) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = editedIsAllDay, onCheckedChange = { editedIsAllDay = it })
+                            Text("All day", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        if (!editedIsAllDay) {
+                            TextButton(onClick = { showTimePicker = true }) {
+                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Time: ${editedStartTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                            }
+                        }
+                        OutlinedTextField(
+                            value = editedLocation,
+                            onValueChange = { editedLocation = it },
+                            label = { Text("Location") },
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        )
+                    } else {
+                        val timeRange = if (item.isAllDay) "All Day" else {
+                            "${item.startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))} - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
+                        }
+                        DetailRow(icon = Icons.Default.AccessTime, label = "Time", value = timeRange)
+                        item.location?.let {
+                            if (it.isNotBlank()) DetailRow(icon = Icons.Default.LocationOn, label = "Location", value = it)
                         }
                     }
                 }
 
                 if (item is TimelineItem.Task) {
-                    item.deadlineDate?.let {
-                        DetailRow(
-                            icon = Icons.Default.Flag,
-                            label = "Deadline",
-                            value = it.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
-                            color = if (item.isMissed()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        )
+                    if (isEditing) {
+                        TextButton(onClick = { showDeadlinePicker = true }) {
+                            Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (editedDeadlineDate == null) "Add Deadline" else "Deadline: ${editedDeadlineDate?.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                        }
+                        
+                        Text("Priority", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 8.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Priority.entries.forEach { priority ->
+                                FilterChip(
+                                    selected = editedPriority == priority,
+                                    onClick = { editedPriority = priority },
+                                    label = { Text(priority.name) },
+                                    leadingIcon = if (editedPriority == priority) {
+                                        { Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null
+                                )
+                            }
+                        }
+                    } else {
+                        item.deadlineDate?.let {
+                            DetailRow(
+                                icon = Icons.Default.Flag,
+                                label = "Deadline",
+                                value = it.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")),
+                                color = if (item.isMissed()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        DetailRow(icon = Icons.Default.PriorityHigh, label = "Priority", value = item.priority.name)
                     }
-                    DetailRow(
-                        icon = Icons.Default.PriorityHigh,
-                        label = "Priority",
-                        value = item.priority.name
-                    )
                 }
 
-                if (item.details.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                if (isEditing) {
+                    OutlinedTextField(
+                        value = editedDetails,
+                        onValueChange = { editedDetails = it },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                } else if (item.details.isNotBlank()) {
                     Row(verticalAlignment = Alignment.Top) {
                         Icon(
                             Icons.AutoMirrored.Filled.Notes,
@@ -404,16 +625,8 @@ fun ItemDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
-                            Text(
-                                text = "Description",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = item.details,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text(text = "Description", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                            Text(text = item.details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -424,28 +637,56 @@ fun ItemDetailDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (item is TimelineItem.Task) {
+                    if (isEditing) {
                         Button(
-                            onClick = onToggleTask,
+                            onClick = {
+                                val updatedItem = when (item) {
+                                    is TimelineItem.Event -> item.copy(
+                                        title = editedTitle,
+                                        details = editedDetails,
+                                        date = editedDate,
+                                        startTime = editedStartTime,
+                                        endTime = editedEndTime,
+                                        isAllDay = editedIsAllDay,
+                                        location = editedLocation.ifBlank { null }
+                                    )
+                                    is TimelineItem.Task -> item.copy(
+                                        title = editedTitle,
+                                        details = editedDetails,
+                                        date = editedDate,
+                                        deadlineDate = editedDeadlineDate,
+                                        priority = editedPriority
+                                    )
+                                }
+                                onSave(updatedItem)
+                            },
                             modifier = Modifier.weight(1f),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Text(if (item.isCompleted) "Mark as Active" else "Mark as Done")
+                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Save Changes")
                         }
-                    }
-
-                    TextButton(
-                        onClick = onDelete,
-                        modifier = Modifier.weight(if (item is TimelineItem.Task) 0.5f else 1f),
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete")
+                    } else {
+                        if (item is TimelineItem.Task) {
+                            Button(
+                                onClick = onToggleTask,
+                                modifier = Modifier.weight(1f),
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text(if (item.isCompleted) "Mark as Active" else "Mark as Done")
+                            }
+                        }
+                        
+                        TextButton(
+                            onClick = onDelete,
+                            modifier = Modifier.weight(if (item is TimelineItem.Task) 0.5f else 1f),
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Delete")
+                        }
                     }
                 }
             }

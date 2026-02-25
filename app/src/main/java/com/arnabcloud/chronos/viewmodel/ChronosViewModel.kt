@@ -55,6 +55,14 @@ class ChronosViewModel : ViewModel() {
         _items.remove(item)
     }
 
+    fun updateItem(updatedItem: TimelineItem) {
+        val index = _items.indexOfFirst { it.id == updatedItem.id }
+        if (index != -1) {
+            _items[index] = updatedItem
+            scheduleReminder(updatedItem)
+        }
+    }
+
     fun toggleComplete(item: TimelineItem) {
         if (item is TimelineItem.Task) {
             val index = _items.indexOfFirst { it.id == item.id }
