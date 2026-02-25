@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -521,6 +520,7 @@ fun ItemDetailDialog(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isEditing) {
+                            // Clear 'Discard' action using a TextButton to differentiate from Dialog Close
                             TextButton(
                                 onClick = {
                                     // Discard changes and revert state
@@ -542,6 +542,7 @@ fun ItemDetailDialog(
                             ) {
                                 Text("Discard", color = MaterialTheme.colorScheme.error)
                             }
+                            // Show a checkmark for saving in the header too for convenience
                             IconButton(
                                 onClick = {
                                     val updatedItem = when (item) {
@@ -580,6 +581,7 @@ fun ItemDetailDialog(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
+                            // Only show Close button in View mode to force Save/Discard in Edit mode
                             IconButton(onClick = onDismiss) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -910,43 +912,77 @@ fun DurationPickerDialog(
     var hours by remember { mutableStateOf(initialDuration.toHours().toString()) }
     var minutes by remember { mutableStateOf((initialDuration.toMinutes() % 60).toString()) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Set Duration") },
-        text = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = hours,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) hours = it },
-                    label = { Text("Hours") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                Text(
+                    text = "Set Duration",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(":", style = MaterialTheme.typography.headlineMedium)
-                OutlinedTextField(
-                    value = minutes,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) minutes = it },
-                    label = { Text("Minutes") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = hours,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) hours = it },
+                        label = { Text("Hours") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    Text(":", style = MaterialTheme.typography.headlineMedium)
+                    OutlinedTextField(
+                        value = minutes,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) minutes = it },
+                        label = { Text("Minutes") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val h = hours.toLongOrNull() ?: 0L
+                            val m = minutes.toLongOrNull() ?: 0L
+                            onConfirm(Duration.ofHours(h).plusMinutes(m))
+                        },
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Text("Confirm")
+                    }
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val h = hours.toLongOrNull() ?: 0L
-                val m = minutes.toLongOrNull() ?: 0L
-                onConfirm(Duration.ofHours(h).plusMinutes(m))
-            }) { Text("Confirm") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 }
 
 private fun formatDuration(duration: Duration): String {
@@ -993,7 +1029,7 @@ fun DetailRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddTaskDialog(
     isEvent: Boolean,
@@ -1007,6 +1043,7 @@ fun AddTaskDialog(
     var startTime by remember { mutableStateOf(LocalTime.now()) }
     var endTime by remember { mutableStateOf(LocalTime.now().plusHours(1)) }
     var deadlineDate by remember { mutableStateOf<LocalDate?>(null) }
+    var priority by remember { mutableStateOf(Priority.MEDIUM) }
 
     var isDurationMode by remember { mutableStateOf(false) }
 
@@ -1133,147 +1170,234 @@ fun AddTaskDialog(
         )
     }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isEvent) "New Event" else "New Task") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Title") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = details,
-                    onValueChange = { details = it },
-                    label = { Text("Details") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                TextButton(onClick = { showDatePicker = true }) {
-                    Icon(
-                        Icons.Default.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth()
+            ) {
+                // Header Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Badge(
+                            containerColor = if (!isEvent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = if (!isEvent) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Text(
+                                text = if (isEvent) "NEW EVENT" else "NEW TASK",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isEvent) "Create Event" else "Create Task",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close Dialog")
+                    }
                 }
 
-                if (isEvent) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
-                        Text("All day", style = MaterialTheme.typography.bodyMedium)
-                    }
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    if (!isAllDay) {
-                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                            TextButton(onClick = { showStartTimePicker = true }) {
-                                Icon(
-                                    Icons.Default.AccessTime,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Start: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
-                            }
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Title") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = details,
+                        onValueChange = { details = it },
+                        label = { Text("Details") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = !isDurationMode,
-                                    onClick = { isDurationMode = false },
-                                    label = { Text("End Time") }
-                                )
-                                FilterChip(
-                                    selected = isDurationMode,
-                                    onClick = { isDurationMode = true },
-                                    label = { Text("Duration") }
-                                )
-                            }
-
-                            if (isDurationMode) {
-                                TextButton(onClick = { showDurationPicker = true }) {
-                                    Icon(
-                                        Icons.Default.AccessTime,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        "Duration: ${
-                                            formatDuration(
-                                                Duration.between(
-                                                    startTime,
-                                                    endTime
-                                                )
-                                            )
-                                        }"
-                                    )
-                                }
-                            } else {
-                                TextButton(onClick = { showEndTimePicker = true }) {
-                                    Icon(
-                                        Icons.Default.AccessTime,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("End: ${endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    TextButton(onClick = { showDeadlinePicker = true }) {
+                    TextButton(onClick = { showDatePicker = true }) {
                         Icon(
-                            Icons.Default.Flag,
+                            Icons.Default.CalendarToday,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                    }
+
+                    if (isEvent) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
+                            Text("All day", style = MaterialTheme.typography.bodyMedium)
+                        }
+
+                        if (!isAllDay) {
+                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                TextButton(onClick = { showStartTimePicker = true }) {
+                                    Icon(
+                                        Icons.Default.AccessTime,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Start: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = !isDurationMode,
+                                        onClick = { isDurationMode = false },
+                                        label = { Text("End Time") }
+                                    )
+                                    FilterChip(
+                                        selected = isDurationMode,
+                                        onClick = { isDurationMode = true },
+                                        label = { Text("Duration") }
+                                    )
+                                }
+
+                                if (isDurationMode) {
+                                    TextButton(onClick = { showDurationPicker = true }) {
+                                        Icon(
+                                            Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Duration: ${
+                                                formatDuration(
+                                                    Duration.between(
+                                                        startTime,
+                                                        endTime
+                                                    )
+                                                )
+                                            }"
+                                        )
+                                    }
+                                } else {
+                                    TextButton(onClick = { showEndTimePicker = true }) {
+                                        Icon(
+                                            Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("End: ${endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        TextButton(onClick = { showDeadlinePicker = true }) {
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                if (deadlineDate == null) "Add Deadline" else "Deadline: ${
+                                    deadlineDate?.format(
+                                        DateTimeFormatter.ofPattern("MMM dd, yyyy")
+                                    )
+                                }"
+                            )
+                        }
+                        
                         Text(
-                            if (deadlineDate == null) "Add Deadline" else "Deadline: ${
-                                deadlineDate?.format(
-                                    DateTimeFormatter.ofPattern("MMM dd, yyyy")
-                                )
-                            }"
+                            "Priority",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(top = 8.dp)
                         )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Priority.entries.forEach { p ->
+                                FilterChip(
+                                    selected = priority == p,
+                                    onClick = { priority = p },
+                                    label = { Text(p.name) },
+                                    leadingIcon = if (priority == p) {
+                                        {
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    } else null
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(0.5f)
+                    ) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            if (title.isNotBlank()) {
+                                val item = if (isEvent) {
+                                    TimelineItem.Event(
+                                        title = title,
+                                        details = details,
+                                        date = date,
+                                        startTime = if (isAllDay) LocalTime.MIDNIGHT else startTime,
+                                        endTime = if (isAllDay) LocalTime.MAX else endTime,
+                                        isAllDay = isAllDay
+                                    )
+                                } else {
+                                    TimelineItem.Task(
+                                        title = title,
+                                        details = details,
+                                        date = date,
+                                        deadlineDate = deadlineDate,
+                                        priority = priority
+                                    )
+                                }
+                                onConfirm(item)
+                            }
+                        },
+                        enabled = title.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Save")
                     }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (title.isNotBlank()) {
-                        val item = if (isEvent) {
-                            TimelineItem.Event(
-                                title = title,
-                                details = details,
-                                date = date,
-                                startTime = if (isAllDay) LocalTime.MIDNIGHT else startTime,
-                                endTime = if (isAllDay) LocalTime.MAX else endTime,
-                                isAllDay = isAllDay
-                            )
-                        } else {
-                            TimelineItem.Task(
-                                title = title,
-                                details = details,
-                                date = date,
-                                deadlineDate = deadlineDate
-                            )
-                        }
-                        onConfirm(item)
-                    }
-                },
-                enabled = title.isNotBlank()
-            ) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 }
