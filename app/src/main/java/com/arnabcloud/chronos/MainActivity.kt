@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
 fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
     val pagerState = rememberPagerState(pageCount = { bottomNavItems.size })
     val coroutineScope = rememberCoroutineScope()
-    
+
     var showSpeedDial by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var isEventCreation by remember { mutableStateOf(false) }

@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -42,6 +42,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -53,6 +54,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +64,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -250,39 +254,101 @@ fun Timeline(
     onSetCompleted: (TimelineItem, Boolean) -> Unit
 ) {
     val hours = (0..23).toList()
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
+
+    // A task is unscheduled if it has no taskTime AND (no deadlineTime OR deadline is not today)
+    val untimedTasks = items.filterIsInstance<TimelineItem.Task>().filter {
+        it.taskTime == null && (it.deadlineDate != selectedDate || it.deadlineTime == null)
+    }
+
+    // Timed items include events and tasks that have either a scheduled time OR a deadline time today
+    val timedItems = items.filter {
+        it is TimelineItem.Event || (it is TimelineItem.Task && (it.taskTime != null || (it.deadlineDate == selectedDate && it.deadlineTime != null)))
+    }
+
+    var currentTime by remember { mutableStateOf(LocalTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentTime = LocalTime.now()
+            delay(60000)
+        }
+    }
 
     // Scroll to current hour only if today is selected
     LaunchedEffect(selectedDate) {
         if (selectedDate == LocalDate.now()) {
             val currentHour = LocalTime.now().hour
-            scrollState.scrollTo((currentHour * HourSlotHeight * 2.5).toInt())
+            val untimedTasksHeaderCount = if (untimedTasks.isNotEmpty()) 1 else 0
+            listState.scrollToItem(currentHour + untimedTasksHeaderCount)
         } else {
-            scrollState.scrollTo(0)
+            listState.scrollToItem(0)
         }
     }
 
-    Box(modifier = modifier.verticalScroll(scrollState)) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            hours.forEach { hour ->
-                HourSlot(
-                    hour = hour,
-                    itemsInHour = items.filter {
-                        when (it) {
-                            is TimelineItem.Event -> it.startTime.hour == hour
-                            is TimelineItem.Task -> it.date.atStartOfDay().hour == hour
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+    ) {
+        if (untimedTasks.isNotEmpty()) {
+            stickyHeader {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background,
+                    tonalElevation = 2.dp
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Unscheduled Tasks",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        untimedTasks.forEach { task ->
+                            SwipeableTaskCard(
+                                item = task,
+                                isSelected = task.id in selectedItems,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 4.dp)
+                                    .combinedClickable(
+                                        onClick = { onItemClick(task) },
+                                        onLongClick = { onItemLongClick(task) }
+                                    ),
+                                onRemove = { onRemoveItem(task) },
+                                onSetCompleted = { completed -> onSetCompleted(task, completed) },
+                                selectedDate = selectedDate
+                            )
                         }
-                    },
-                    selectedItems = selectedItems,
-                    onItemClick = onItemClick,
-                    onItemLongClick = onItemLongClick,
-                    onRemoveItem = onRemoveItem,
-                    onSetCompleted = onSetCompleted
-                )
+                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
             }
         }
-        if (selectedDate == LocalDate.now()) {
-            NowLine()
+
+        items(hours) { hour ->
+            val itemsInHour = timedItems.filter {
+                when (it) {
+                    is TimelineItem.Event -> it.startTime.hour == hour
+                    is TimelineItem.Task -> {
+                        val taskHour = it.taskTime?.hour
+                        val deadlineHour =
+                            if (it.deadlineDate == selectedDate) it.deadlineTime?.hour else null
+                        // Task appears in both scheduled hour and deadline hour
+                        taskHour == hour || deadlineHour == hour
+                    }
+                }
+            }
+            HourSlot(
+                hour = hour,
+                itemsInHour = itemsInHour,
+                selectedItems = selectedItems,
+                onItemClick = onItemClick,
+                onItemLongClick = onItemLongClick,
+                onRemoveItem = onRemoveItem,
+                onSetCompleted = onSetCompleted,
+                currentTime = if (selectedDate == LocalDate.now() && currentTime.hour == hour) currentTime else null,
+                selectedDate = selectedDate
+            )
         }
     }
 }
@@ -296,12 +362,18 @@ fun HourSlot(
     onItemClick: (TimelineItem) -> Unit,
     onItemLongClick: (TimelineItem) -> Unit,
     onRemoveItem: (TimelineItem) -> Unit,
-    onSetCompleted: (TimelineItem, Boolean) -> Unit
+    onSetCompleted: (TimelineItem, Boolean) -> Unit,
+    currentTime: LocalTime? = null,
+    selectedDate: LocalDate
 ) {
+    var slotHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+
     Row(
         modifier = Modifier
             .heightIn(min = HourSlotHeight.dp)
             .fillMaxWidth()
+            .onGloballyPositioned { slotHeight = it.size.height }
     ) {
         Text(
             text = String.format(Locale.getDefault(), "%02d:00", hour),
@@ -309,7 +381,7 @@ fun HourSlot(
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier
                 .width(48.dp)
-                .padding(top = 8.dp)
+                .padding(top = 8.dp, start = 8.dp)
         )
         Box(
             modifier = Modifier
@@ -324,7 +396,7 @@ fun HourSlot(
                 thickness = 1.dp
             )
 
-            Column(modifier = Modifier.padding(top = 24.dp, start = 8.dp, end = 8.dp)) {
+            Column(modifier = Modifier.padding(top = 24.dp, start = 8.dp, end = 16.dp)) {
                 itemsInHour.forEach { item ->
                     val isSelected = item.id in selectedItems
                     SwipeableTaskCard(
@@ -338,8 +410,28 @@ fun HourSlot(
                                 onLongClick = { onItemLongClick(item) }
                             ),
                         onRemove = { onRemoveItem(item) },
-                        onSetCompleted = { completed -> onSetCompleted(item, completed) }
+                        onSetCompleted = { completed -> onSetCompleted(item, completed) },
+                        selectedDate = selectedDate
                     )
+                }
+            }
+
+            if (currentTime != null) {
+                val fraction = currentTime.minute / 60f
+                val slotHeightDp = with(density) { slotHeight.toDp() }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .offset(y = 16.dp + (slotHeightDp - 16.dp) * fraction),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(MaterialTheme.colorScheme.error, CircleShape)
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.error, thickness = 2.dp)
                 }
             }
         }
@@ -353,7 +445,8 @@ fun SwipeableTaskCard(
     isSelected: Boolean,
     modifier: Modifier = Modifier,
     onRemove: () -> Unit,
-    onSetCompleted: (Boolean) -> Unit
+    onSetCompleted: (Boolean) -> Unit,
+    selectedDate: LocalDate
 ) {
     val dismissState = rememberSwipeToDismissBoxState(positionalThreshold = { it * .25f })
 
@@ -407,7 +500,8 @@ fun SwipeableTaskCard(
             when (item) {
                 is TimelineItem.Task -> TaskCard(
                     item,
-                    isSelected
+                    isSelected,
+                    selectedDate = selectedDate
                 ) { onSetCompleted(!item.isCompleted) }
 
                 is TimelineItem.Event -> EventCard(item, isSelected)
@@ -471,6 +565,7 @@ fun TaskCard(
     item: TimelineItem.Task,
     isSelected: Boolean,
     modifier: Modifier = Modifier,
+    selectedDate: LocalDate,
     onToggleComplete: () -> Unit
 ) {
     val isMissed = item.isMissed()
@@ -519,6 +614,31 @@ fun TaskCard(
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
+
+                // Show scheduled time
+                item.taskTime?.let {
+                    Text(
+                        text = "Time: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+
+                // Show deadline if it's today
+                if (item.deadlineDate == selectedDate) {
+                    item.deadlineTime?.let {
+                        Text(
+                            text = "Due: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(
+                                alpha = 0.5f
+                            ) else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+
                 if (isMissed && !item.isCompleted) {
                     Text(
                         text = "Missed Deadline",
@@ -529,34 +649,5 @@ fun TaskCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun NowLine() {
-    var currentTime by remember { mutableStateOf(LocalTime.now()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            currentTime = LocalTime.now()
-            delay(1000)
-        }
-    }
-
-    val minutesFromMidnight = currentTime.hour * 60 + currentTime.minute
-    val yOffset = minutesFromMidnight * (HourSlotHeight / 60.0) + HourSlotHeight
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .offset(y = yOffset.dp)
-            .padding(start = 40.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(MaterialTheme.colorScheme.error, CircleShape)
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.error, thickness = 2.dp)
     }
 }
