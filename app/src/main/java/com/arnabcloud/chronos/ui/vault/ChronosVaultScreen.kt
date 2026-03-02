@@ -3,12 +3,16 @@ package com.arnabcloud.chronos.ui.vault
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,12 +21,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -35,6 +39,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
@@ -45,7 +50,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,6 +64,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -69,6 +74,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.TimelineItem
+import com.arnabcloud.chronos.ui.theme.CompletedColor
+import com.arnabcloud.chronos.ui.theme.EventColor
+import com.arnabcloud.chronos.ui.theme.EventColorDark
+import com.arnabcloud.chronos.ui.theme.EventColorLight
+import com.arnabcloud.chronos.ui.theme.MissedColor
+import com.arnabcloud.chronos.ui.theme.getPriorityColor
+import com.arnabcloud.chronos.ui.theme.getPriorityContainerColor
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 import java.time.Duration
 import java.time.Instant
@@ -91,7 +103,8 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
         Text(
             text = "My Tasks & Events",
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Black,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
@@ -100,8 +113,9 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            shape = MaterialTheme.shapes.large
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            shape = MaterialTheme.shapes.extraLarge,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
         ) {
             Row(
                 modifier = Modifier.padding(20.dp),
@@ -110,13 +124,14 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
                 Column(modifier = Modifier.weight(1f)) {
                     val remaining = items.count { it is TimelineItem.Task && !it.isCompleted }
                     Text(
-                        text = "$remaining tasks remaining",
+                        text = if (remaining > 0) "$remaining items need attention" else "All caught up!",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Your productivity hub",
-                        style = MaterialTheme.typography.bodySmall
+                        text = "Plan your day, conquer your goals",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -167,149 +182,197 @@ fun VaultItemCard(
     val isTask = item is TimelineItem.Task
     val isCompleted = if (item is TimelineItem.Task) item.isCompleted else false
     val isMissed = if (item is TimelineItem.Task) item.isMissed() else false
+    val isDark = isSystemInDarkTheme()
 
-    val border = when {
-        isMissed -> BorderStroke(2.dp, MaterialTheme.colorScheme.error)
-        !isTask -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-        else -> null
+    val accentColor = when {
+        !isTask -> EventColor
+        isCompleted -> CompletedColor
+        isMissed -> MissedColor
+        else -> getPriorityColor(item.priority)
     }
 
     val containerColor = when {
-        isCompleted -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        !isTask -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-        isMissed -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.05f)
-        else -> MaterialTheme.colorScheme.surface
+        !isTask -> if (isDark) EventColorDark else EventColorLight
+        isCompleted -> if (isDark) Color(0xFF2C2C2C) else Color(0xFFF5F5F5)
+        isMissed -> if (isDark) MissedColor.copy(alpha = 0.15f) else MissedColor.copy(alpha = 0.05f)
+        else -> getPriorityContainerColor(item.priority, isDark)
     }
 
-    OutlinedCard(
+    val contentColor = when {
+        !isTask -> if (isDark) Color.White else Color(0xFF0D47A1)
+        isCompleted -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        isMissed -> if (isDark) Color(0xFFFFCDD2) else MissedColor
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.large,
-        border = border ?: CardDefaults.outlinedCardBorder(),
-        colors = CardDefaults.outlinedCardColors(containerColor = containerColor)
+        border = if (isMissed && !isCompleted) BorderStroke(
+            2.dp,
+            MissedColor.copy(alpha = 0.5f)
+        ) else null,
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        )
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isTask) {
-                IconButton(onClick = onToggle) {
-                    Icon(
-                        imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
-                        contentDescription = "Toggle Status",
-                        tint = if (isCompleted) MaterialTheme.colorScheme.primary else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-                    )
-                }
-            } else {
-                Icon(
-                    imageVector = Icons.Default.CalendarToday,
-                    contentDescription = null,
-                    modifier = Modifier.padding(12.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Column(
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp)
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(accentColor)
+            )
+
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
-                        color = if (isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (!isTask) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
-                            Text("Event", style = MaterialTheme.typography.labelSmall)
-                        }
+                if (isTask) {
+                    IconButton(onClick = onToggle) {
+                        Icon(
+                            imageVector = if (isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                            contentDescription = "Toggle Status",
+                            tint = accentColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(accentColor.copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
 
-                if (item.details.isNotBlank()) {
-                    Text(
-                        text = item.details,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
                 ) {
-                    // Time/Date Info
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.outline
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        val timeStr = when (item) {
-                            is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.format(
-                                DateTimeFormatter.ofPattern("hh:mm a")
-                            )
-
-                            is TimelineItem.Task -> {
-                                item.taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
-                                    ?: "Task"
+                        if (!isTask) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Badge(
+                                containerColor = accentColor.copy(alpha = 0.2f),
+                                contentColor = contentColor
+                            ) {
+                                Text(
+                                    "EVENT",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                                )
+                            }
+                        } else if (isMissed && !isCompleted) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Badge(containerColor = MissedColor, contentColor = Color.White) {
+                                Text(
+                                    "MISSED",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                                )
                             }
                         }
+                    }
+
+                    if (item.details.isNotBlank()) {
                         Text(
-                            text = "${item.date.format(DateTimeFormatter.ofPattern("MMM dd"))} • $timeStr",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline
+                            text = item.details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = contentColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
 
-                    // Deadline Info for Tasks
-                    if (item is TimelineItem.Task && item.deadlineDate != null) {
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Time/Date Info
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                Icons.Default.Flag,
+                                Icons.Default.AccessTime,
                                 contentDescription = null,
                                 modifier = Modifier.size(14.dp),
-                                tint = if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(
-                                    alpha = 0.6f
-                                )
+                                tint = contentColor.copy(alpha = 0.6f)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            val deadlineTimeStr = item.deadlineTime?.let {
-                                " at ${
-                                    it.format(
-                                        DateTimeFormatter.ofPattern("hh:mm a")
-                                    )
-                                }"
-                            } ?: ""
+                            val timeStr = when (item) {
+                                is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.format(
+                                    DateTimeFormatter.ofPattern("hh:mm a")
+                                )
+
+                                is TimelineItem.Task -> {
+                                    item.taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                                        ?: "Anytime"
+                                }
+                            }
                             Text(
-                                text = "Due ${item.deadlineDate.format(DateTimeFormatter.ofPattern("MMM dd"))}$deadlineTimeStr",
+                                text = "${item.date.format(DateTimeFormatter.ofPattern("MMM dd"))} • $timeStr",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(
-                                    alpha = 0.8f
-                                ),
-                                fontWeight = if (isMissed) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = FontWeight.Bold,
+                                color = contentColor.copy(alpha = 0.6f)
                             )
+                        }
+
+                        // Deadline Info for Tasks
+                        if (item is TimelineItem.Task && item.deadlineDate != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (isMissed) MissedColor else accentColor.copy(alpha = 0.6f)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Due ${
+                                        item.deadlineDate.format(
+                                            DateTimeFormatter.ofPattern(
+                                                "MMM dd"
+                                            )
+                                        )
+                                    }",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isMissed) MissedColor else contentColor.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = if (isDark) Color.White.copy(alpha = 0.4f) else Color.Black.copy(
+                            alpha = 0.3f
+                        ),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
@@ -569,12 +632,14 @@ fun ItemDetailDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Badge(
-                            containerColor = if (item is TimelineItem.Task) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = if (item is TimelineItem.Task) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = if (item is TimelineItem.Task) MaterialTheme.colorScheme.secondaryContainer else EventColor.copy(
+                                alpha = 0.2f
+                            ),
+                            contentColor = if (item is TimelineItem.Task) MaterialTheme.colorScheme.onSecondaryContainer else EventColor
                         ) {
                             Text(
                                 text = if (item is TimelineItem.Task) "TASK" else "EVENT",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
@@ -590,7 +655,7 @@ fun ItemDetailDialog(
                             Text(
                                 text = item.title,
                                 style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -598,7 +663,6 @@ fun ItemDetailDialog(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isEditing) {
-                            // Clear 'Discard' action using a TextButton to differentiate from Dialog Close
                             TextButton(
                                 onClick = {
                                     // Discard changes and revert state
@@ -622,39 +686,6 @@ fun ItemDetailDialog(
                             ) {
                                 Text("Discard", color = MaterialTheme.colorScheme.error)
                             }
-                            // Show a checkmark for saving in the header too for convenience
-                            IconButton(
-                                onClick = {
-                                    val updatedItem = when (item) {
-                                        is TimelineItem.Event -> item.copy(
-                                            title = editedTitle,
-                                            details = editedDetails,
-                                            date = editedDate,
-                                            startTime = if (editedIsAllDay) LocalTime.MIDNIGHT else editedStartTime,
-                                            endTime = if (editedIsAllDay) LocalTime.MAX else editedEndTime,
-                                            isAllDay = editedIsAllDay,
-                                            location = editedLocation.ifBlank { null }
-                                        )
-
-                                        is TimelineItem.Task -> item.copy(
-                                            title = editedTitle,
-                                            details = editedDetails,
-                                            date = editedDate,
-                                            taskTime = editedTaskTime,
-                                            deadlineDate = editedDeadlineDate,
-                                            deadlineTime = editedDeadlineTime,
-                                            priority = editedPriority
-                                        )
-                                    }
-                                    onSave(updatedItem)
-                                }
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = "Save Changes",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
                         } else {
                             IconButton(onClick = { isEditing = true }) {
                                 Icon(
@@ -663,7 +694,6 @@ fun ItemDetailDialog(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
-                            // Only show Close button in View mode to force Save/Discard in Edit mode
                             IconButton(onClick = onDismiss) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -703,7 +733,7 @@ fun ItemDetailDialog(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                            Text("Date: ${editedDate.format(DateTimeFormatter.ofPattern("MMM dd"))}")
                         }
                         if (item is TimelineItem.Task) {
                             TextButton(
@@ -900,10 +930,15 @@ fun ItemDetailDialog(
                         )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Priority.entries.forEach { priority ->
+                                val pColor = getPriorityColor(priority)
                                 FilterChip(
                                     selected = editedPriority == priority,
                                     onClick = { editedPriority = priority },
                                     label = { Text(priority.name) },
+                                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = pColor.copy(alpha = 0.2f),
+                                        selectedLabelColor = pColor
+                                    ),
                                     leadingIcon = if (editedPriority == priority) {
                                         {
                                             Icon(
@@ -917,7 +952,7 @@ fun ItemDetailDialog(
                             }
                         }
                     } else {
-                        item.deadlineDate?.let {
+                        item.deadlineDate?.let { it ->
                             val timeStr = item.deadlineTime?.let {
                                 " at ${
                                     it.format(
@@ -925,17 +960,19 @@ fun ItemDetailDialog(
                                     )
                                 }"
                             } ?: ""
+                            val isMissed = item.isMissed()
                             DetailRow(
                                 icon = Icons.Default.Flag,
                                 label = "Deadline",
                                 value = "${it.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}$timeStr",
-                                color = if (item.isMissed()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                color = if (isMissed) MissedColor else MaterialTheme.colorScheme.onSurface
                             )
                         }
                         DetailRow(
                             icon = Icons.Default.PriorityHigh,
                             label = "Priority",
-                            value = item.priority.name
+                            value = item.priority.name,
+                            color = getPriorityColor(item.priority)
                         )
                     }
                 }
@@ -962,6 +999,7 @@ fun ItemDetailDialog(
                             Text(
                                 text = "Description",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
@@ -1023,7 +1061,7 @@ fun ItemDetailDialog(
                                 modifier = Modifier.weight(1f),
                                 shape = MaterialTheme.shapes.medium
                             ) {
-                                Text(if (item.isCompleted) "Mark as Active" else "Mark as Done")
+                                Text(if (item.isCompleted) "Re-activate Task" else "Complete Task")
                             }
                         }
 
@@ -1143,7 +1181,7 @@ fun DetailRow(
     icon: ImageVector,
     label: String,
     value: String,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface
+    color: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Row(
         modifier = Modifier
@@ -1162,11 +1200,13 @@ fun DetailRow(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.outline
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
             )
             Text(
                 text = value,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
                 color = color
             )
         }
@@ -1408,12 +1448,14 @@ fun AddTaskDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Badge(
-                            containerColor = if (!isEvent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = if (!isEvent) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = if (!isEvent) MaterialTheme.colorScheme.secondaryContainer else EventColor.copy(
+                                alpha = 0.2f
+                            ),
+                            contentColor = if (!isEvent) MaterialTheme.colorScheme.onSecondaryContainer else EventColor
                         ) {
                             Text(
                                 text = if (isEvent) "NEW EVENT" else "NEW TASK",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
@@ -1421,7 +1463,7 @@ fun AddTaskDialog(
                         Text(
                             text = if (isEvent) "Create Event" else "Create Task",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -1459,7 +1501,7 @@ fun AddTaskDialog(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))}")
+                            Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd"))}")
                         }
                         if (!isEvent) {
                             TextButton(
@@ -1584,10 +1626,15 @@ fun AddTaskDialog(
                         )
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Priority.entries.forEach { p ->
+                                val pColor = getPriorityColor(p)
                                 FilterChip(
                                     selected = priority == p,
                                     onClick = { priority = p },
                                     label = { Text(p.name) },
+                                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = pColor.copy(alpha = 0.2f),
+                                        selectedLabelColor = pColor
+                                    ),
                                     leadingIcon = if (priority == p) {
                                         {
                                             Icon(
@@ -1651,7 +1698,7 @@ fun AddTaskDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save")
+                        Text("Create")
                     }
                 }
             }

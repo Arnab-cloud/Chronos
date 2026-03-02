@@ -6,14 +6,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoveUp
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.Badge
@@ -70,6 +75,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.arnabcloud.chronos.model.TimelineItem
+import com.arnabcloud.chronos.ui.theme.CompletedColor
+import com.arnabcloud.chronos.ui.theme.EventColor
+import com.arnabcloud.chronos.ui.theme.EventColorDark
+import com.arnabcloud.chronos.ui.theme.EventColorLight
+import com.arnabcloud.chronos.ui.theme.MissedColor
+import com.arnabcloud.chronos.ui.theme.getPriorityColor
+import com.arnabcloud.chronos.ui.theme.getPriorityContainerColor
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 import kotlinx.coroutines.delay
 import java.time.Instant
@@ -111,6 +123,20 @@ fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        if (multiSelectMode) {
+            ContextualTopAppBar(
+                selectionCount = selectedItems.size,
+                onClose = onClearSelection,
+                onDelete = {
+                    selectedItems.toList().forEach { id ->
+                        viewModel.items.find { it.id == id }?.let { viewModel.removeItem(it) }
+                    }
+                    onClearSelection()
+                },
+                onMove = { showMoveDialog = true }
+            )
+        }
+
         DayPicker(
             selectedDate = selectedDate,
             onDateSelected = { selectedDate = it },
@@ -134,7 +160,6 @@ fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
                     selectedItems.add(item.id)
                 }
             },
-            onAddItem = { viewModel.addItem(it) },
             onRemoveItem = { viewModel.removeItem(it) },
             onSetCompleted = { item, _ -> viewModel.toggleComplete(item) }
         )
@@ -249,7 +274,6 @@ fun Timeline(
     selectedItems: List<UUID>,
     onItemClick: (TimelineItem) -> Unit,
     onItemLongClick: (TimelineItem) -> Unit,
-    onAddItem: (TimelineItem) -> Unit,
     onRemoveItem: (TimelineItem) -> Unit,
     onSetCompleted: (TimelineItem, Boolean) -> Unit
 ) {
@@ -296,7 +320,14 @@ fun Timeline(
                     color = MaterialTheme.colorScheme.background,
                     tonalElevation = 2.dp
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(
+                        modifier = Modifier.padding(
+                            top = 16.dp,
+                            start = 12.dp,
+                            end = 12.dp,
+                            bottom = 10.dp
+                        )
+                    ) {
                         Text(
                             text = "Unscheduled Tasks",
                             style = MaterialTheme.typography.labelMedium,
@@ -319,7 +350,6 @@ fun Timeline(
                                 selectedDate = selectedDate
                             )
                         }
-                        HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
                     }
                 }
             }
@@ -492,7 +522,7 @@ fun SwipeableTaskCard(
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer
+                    tint = if (direction == SwipeToDismissBoxValue.EndToStart) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         },
@@ -512,50 +542,67 @@ fun SwipeableTaskCard(
 
 @Composable
 fun EventCard(item: TimelineItem.Event, isSelected: Boolean, modifier: Modifier = Modifier) {
+    val isDark = isSystemInDarkTheme()
+    val containerColor = if (isDark) EventColorDark else EventColorLight
+    val contentColor = if (isDark) Color.White else Color(0xFF0D47A1)
+
     ElevatedCard(
         modifier = modifier.border(
             border = if (isSelected) BorderStroke(
-                2.dp,
+                3.dp,
                 MaterialTheme.colorScheme.primary
-            ) else BorderStroke(width = 0.dp, color = Color.Black)
+            ) else BorderStroke(width = 0.dp, color = Color.Transparent)
         ),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            containerColor = containerColor,
+            contentColor = contentColor
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Badge(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)) {
-                    Text("Event", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-            if (item.details.isNotBlank()) {
-                Text(
-                    text = item.details,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
-            val timeText = if (item.isAllDay) "All Day" else "${
-                item.startTime.format(
-                    DateTimeFormatter.ofPattern("hh:mm a")
-                )
-            } - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
-            Text(
-                text = timeText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                    alpha = 0.8f
-                )
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(EventColor)
             )
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Badge(
+                        containerColor = EventColor.copy(alpha = 0.2f),
+                        contentColor = contentColor
+                    ) {
+                        Text(
+                            "EVENT",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                        )
+                    }
+                }
+                if (item.details.isNotBlank()) {
+                    Text(
+                        text = item.details,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                    )
+                }
+                val timeText = if (item.isAllDay) "All Day" else "${
+                    item.startTime.format(
+                        DateTimeFormatter.ofPattern("hh:mm a")
+                    )
+                } - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }
@@ -569,83 +616,146 @@ fun TaskCard(
     onToggleComplete: () -> Unit
 ) {
     val isMissed = item.isMissed()
+    val isDark = isSystemInDarkTheme()
+    val priorityColor = getPriorityColor(item.priority)
+    val priorityContainer = getPriorityContainerColor(item.priority, isDark)
+
+    val containerColor = when {
+        item.isCompleted -> if (isDark) Color(0xFF2C2C2C) else Color(0xFFF5F5F5)
+        isMissed -> if (isDark) MissedColor.copy(alpha = 0.15f) else MissedColor.copy(alpha = 0.05f)
+        else -> priorityContainer
+    }
+
+    val contentColor = when {
+        item.isCompleted -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        isMissed -> if (isDark) Color(0xFFFFCDD2) else MissedColor
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
     Card(
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
         border = if (isSelected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            BorderStroke(3.dp, MaterialTheme.colorScheme.primary)
         } else if (isMissed) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.error)
+            BorderStroke(2.dp, MissedColor.copy(alpha = 0.5f))
         } else {
             null
         },
         colors = CardDefaults.cardColors(
-            containerColor = if (item.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = 0.3f
-            ) else if (isMissed) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f) else MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSecondaryContainer
+            containerColor = containerColor,
+            contentColor = contentColor
         )
     ) {
         Row(
             modifier = Modifier
-                .padding(12.dp)
+                .height(IntrinsicSize.Min)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onToggleComplete) {
+            Box(
+                modifier = Modifier
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(if (item.isCompleted) CompletedColor else if (isMissed) MissedColor else priorityColor)
+            )
+            IconButton(onClick = onToggleComplete, modifier = Modifier.padding(start = 4.dp)) {
                 Icon(
                     imageVector = if (item.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
                     contentDescription = "Complete",
-                    tint = if (item.isCompleted) MaterialTheme.colorScheme.primary else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSecondaryContainer
+                    tint = if (item.isCompleted) CompletedColor else if (isMissed) MissedColor else priorityColor,
+                    modifier = Modifier.size(28.dp)
                 )
             }
-            Column {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = if (isMissed && !item.isCompleted) FontWeight.Bold else FontWeight.Normal,
-                    textDecoration = if (item.isCompleted) TextDecoration.LineThrough else null,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+            Column(
+                modifier = Modifier
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                    .weight(1f)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (isMissed && !item.isCompleted) FontWeight.Black else FontWeight.Bold,
+                        textDecoration = if (item.isCompleted) TextDecoration.LineThrough else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isMissed && !item.isCompleted) {
+                        Badge(containerColor = MissedColor, contentColor = Color.White) {
+                            Text(
+                                "MISSED",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                            )
+                        }
+                    } else if (!item.isCompleted) {
+                        Badge(
+                            containerColor = priorityColor.copy(alpha = 0.2f),
+                            contentColor = priorityColor
+                        ) {
+                            Text(
+                                item.priority.name,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                            )
+                        }
+                    }
+                }
+
                 if (item.details.isNotBlank()) {
                     Text(
                         text = item.details,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp)
+                        maxLines = 2,
+                        color = contentColor.copy(alpha = 0.8f)
                     )
                 }
 
-                // Show scheduled time
-                item.taskTime?.let {
-                    Text(
-                        text = "Time: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Show deadline if it's today
-                if (item.deadlineDate == selectedDate) {
-                    item.deadlineTime?.let {
-                        Text(
-                            text = "Due: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (item.isCompleted) MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.5f
-                            ) else if (isMissed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Show scheduled time
+                    item.taskTime?.let {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = priorityColor.copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = it.format(DateTimeFormatter.ofPattern("hh:mm a")),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
-                }
 
-                if (isMissed && !item.isCompleted) {
-                    Text(
-                        text = "Missed Deadline",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
+                    // Show deadline if it's today
+                    if (item.deadlineDate == selectedDate) {
+                        item.deadlineTime?.let {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = if (isMissed) MissedColor else priorityColor.copy(alpha = 0.6f)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Due: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isMissed) MissedColor else contentColor.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
