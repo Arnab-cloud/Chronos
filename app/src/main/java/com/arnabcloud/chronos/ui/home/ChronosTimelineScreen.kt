@@ -1,5 +1,8 @@
 package com.arnabcloud.chronos.ui.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -9,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,11 +32,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.MoveUp
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -279,6 +286,8 @@ fun Timeline(
 ) {
     val hours = (0..23).toList()
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    var expandedUntimedTasks by rememberSaveable { mutableStateOf(setOf<UUID>()) }
 
     // A task is unscheduled if it has no taskTime AND (no deadlineTime OR deadline is not today)
     val untimedTasks = items.filterIsInstance<TimelineItem.Task>().filter {
@@ -298,87 +307,226 @@ fun Timeline(
         }
     }
 
-    // Scroll to current hour only if today is selected
-    LaunchedEffect(selectedDate) {
-        if (selectedDate == LocalDate.now()) {
-            val currentHour = LocalTime.now().hour
-            val untimedTasksHeaderCount = if (untimedTasks.isNotEmpty()) 1 else 0
-            listState.scrollToItem(currentHour + untimedTasksHeaderCount)
-        } else {
-            listState.scrollToItem(0)
+    BoxWithConstraints(modifier = modifier) {
+        val viewportHeightPx = with(density) { maxHeight.toPx() }
+//        val hourSlotHeightPx = with(density) { HourSlotHeight.dp.toPx() }
+        // Scroll to current hour only if today is selected
+        LaunchedEffect(selectedDate) {
+            if (selectedDate == LocalDate.now()) {
+                val now = LocalTime.now()
+                val currentHour = now.hour
+                val fraction = now.minute / 60f
+                val untimedHeaderCount = if (untimedTasks.isNotEmpty()) 1 else 0
+                val index = currentHour + untimedHeaderCount
+
+                // Position of red line within the slot (matching HourSlot logic)
+                val redLineOffsetInSlotPx =
+                    with(density) { (16.dp + (HourSlotHeight.dp - 16.dp) * fraction).toPx() }
+                // Calculate scroll offset to put red line at viewport center
+                val centerOffsetPx = (viewportHeightPx / 2) - redLineOffsetInSlotPx
+                listState.scrollToItem(index, -centerOffsetPx.toInt())
+            } else {
+                listState.scrollToItem(0)
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = modifier.fillMaxSize()
+        ) {
+            if (untimedTasks.isNotEmpty()) {
+                stickyHeader {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.background,
+                        tonalElevation = 2.dp
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                            untimedTasks.forEach { task ->
+                                UntimedTaskBookmark(
+                                    task = task,
+                                    isExpanded = task.id in expandedUntimedTasks,
+                                    onToggleExpand = {
+                                        expandedUntimedTasks =
+                                            if (task.id in expandedUntimedTasks) {
+                                                expandedUntimedTasks - task.id
+                                            } else {
+                                                expandedUntimedTasks + task.id
+                                            }
+                                    },
+                                    onSetCompleted = { completed ->
+                                        onSetCompleted(
+                                            task,
+                                            completed
+                                        )
+                                    },
+                                    isSelected = task.id in selectedItems,
+                                    onLongClick = { onItemLongClick(task) }
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
+                }
+            }
+
+            items(hours) { hour ->
+                val itemsInHour = timedItems.filter {
+                    when (it) {
+                        is TimelineItem.Event -> it.startTime.hour == hour
+                        is TimelineItem.Task -> {
+                            val taskHour = it.taskTime?.hour
+                            val deadlineHour =
+                                if (it.deadlineDate == selectedDate) it.deadlineTime?.hour else null
+                            // Task appears in both scheduled hour and deadline hour
+                            taskHour == hour || deadlineHour == hour
+                        }
+                    }
+                }
+                HourSlot(
+                    hour = hour,
+                    itemsInHour = itemsInHour,
+                    selectedItems = selectedItems,
+                    onItemClick = onItemClick,
+                    onItemLongClick = onItemLongClick,
+                    onRemoveItem = onRemoveItem,
+                    onSetCompleted = onSetCompleted,
+                    currentTime = if (selectedDate == LocalDate.now() && currentTime.hour == hour) currentTime else null,
+                    selectedDate = selectedDate
+                )
+            }
         }
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = modifier
+}
+
+@Composable
+fun UntimedTaskBookmark(
+    task: TimelineItem.Task,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onSetCompleted: (Boolean) -> Unit,
+    isSelected: Boolean,
+    onLongClick: () -> Unit
+) {
+    val isDark = isSystemInDarkTheme()
+    val priorityColor = getPriorityColor(task.priority)
+    val containerColor = getPriorityContainerColor(task.priority, isDark)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 1.dp)
+            .combinedClickable(
+                onClick = onToggleExpand,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(
+            topStart = 4.dp,
+            bottomStart = 4.dp,
+            topEnd = 8.dp,
+            bottomEnd = 8.dp
+        ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.5f
+            ) else containerColor
+        ),
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
     ) {
-        if (untimedTasks.isNotEmpty()) {
-            stickyHeader {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.background,
-                    tonalElevation = 2.dp
+        Column {
+            Row(
+                modifier = Modifier
+                    .height(32.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // The "Bookmark" tab on the left
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(if (task.isCompleted) CompletedColor else priorityColor)
+                )
+
+                IconButton(
+                    onClick = { onSetCompleted(!task.isCompleted) },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .padding(start = 2.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(
-                            top = 16.dp,
-                            start = 12.dp,
-                            end = 12.dp,
-                            bottom = 10.dp
-                        )
-                    ) {
+                    Icon(
+                        imageVector = if (task.isCompleted) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        tint = if (task.isCompleted) CompletedColor else priorityColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = if (task.isCompleted) TextDecoration.LineThrough else null,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 4.dp),
+                    color = if (task.isCompleted) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                )
+
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(16.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+            }
+
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(start = 34.dp, end = 12.dp, bottom = 6.dp)) {
+                    if (task.details.isNotBlank()) {
                         Text(
-                            text = "Unscheduled Tasks",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            text = task.details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        untimedTasks.forEach { task ->
-                            SwipeableTaskCard(
-                                item = task,
-                                isSelected = task.id in selectedItems,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 4.dp)
-                                    .combinedClickable(
-                                        onClick = { onItemClick(task) },
-                                        onLongClick = { onItemLongClick(task) }
-                                    ),
-                                onRemove = { onRemoveItem(task) },
-                                onSetCompleted = { completed -> onSetCompleted(task, completed) },
-                                selectedDate = selectedDate
+                    }
+                    if (task.deadlineDate != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Flag,
+                                null,
+                                modifier = Modifier.size(10.dp),
+                                tint = if (task.isMissed()) MissedColor else priorityColor
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Due: ${
+                                    task.deadlineDate.format(
+                                        DateTimeFormatter.ofPattern(
+                                            "MMM dd"
+                                        )
+                                    )
+                                }",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (task.isMissed()) MissedColor else priorityColor
                             )
                         }
                     }
                 }
             }
-        }
-
-        items(hours) { hour ->
-            val itemsInHour = timedItems.filter {
-                when (it) {
-                    is TimelineItem.Event -> it.startTime.hour == hour
-                    is TimelineItem.Task -> {
-                        val taskHour = it.taskTime?.hour
-                        val deadlineHour =
-                            if (it.deadlineDate == selectedDate) it.deadlineTime?.hour else null
-                        // Task appears in both scheduled hour and deadline hour
-                        taskHour == hour || deadlineHour == hour
-                    }
-                }
-            }
-            HourSlot(
-                hour = hour,
-                itemsInHour = itemsInHour,
-                selectedItems = selectedItems,
-                onItemClick = onItemClick,
-                onItemLongClick = onItemLongClick,
-                onRemoveItem = onRemoveItem,
-                onSetCompleted = onSetCompleted,
-                currentTime = if (selectedDate == LocalDate.now() && currentTime.hour == hour) currentTime else null,
-                selectedDate = selectedDate
-            )
         }
     }
 }
@@ -580,7 +728,7 @@ fun EventCard(item: TimelineItem.Event, isSelected: Boolean, modifier: Modifier 
                     ) {
                         Text(
                             "EVENT",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                         )
                     }
                 }
@@ -667,11 +815,9 @@ fun TaskCard(
                     modifier = Modifier.size(28.dp)
                 )
             }
-            Column(
-                modifier = Modifier
-                    .padding(vertical = 12.dp, horizontal = 8.dp)
-                    .weight(1f)
-            ) {
+            Column(modifier = Modifier
+                .padding(vertical = 12.dp, horizontal = 8.dp)
+                .weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = item.title,
@@ -684,7 +830,7 @@ fun TaskCard(
                         Badge(containerColor = MissedColor, contentColor = Color.White) {
                             Text(
                                 "MISSED",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                     } else if (!item.isCompleted) {
@@ -694,7 +840,7 @@ fun TaskCard(
                         ) {
                             Text(
                                 item.priority.name,
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black)
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
                     }

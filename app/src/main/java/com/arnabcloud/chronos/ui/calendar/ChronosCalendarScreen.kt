@@ -386,7 +386,7 @@ fun AgendaTaskCard(
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
                     val timeStr =
-                        item.taskTime?.let { it.format(DateTimeFormatter.ofPattern("hh:mm a")) }
+                        item.taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
                             ?: "Anytime"
                     Icon(
                         Icons.Default.AccessTime,
