@@ -1,17 +1,20 @@
 package com.arnabcloud.chronos.viewmodel
 
-import android.util.Log
+import android.app.Application
 import androidx.compose.runtime.mutableStateListOf
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.TimelineItem
+import com.arnabcloud.chronos.util.ReminderManager
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
 
-class ChronosViewModel : ViewModel() {
+class ChronosViewModel(application: Application) : AndroidViewModel(application) {
     private val _items = mutableStateListOf<TimelineItem>()
     val items: List<TimelineItem> get() = _items
+
+    private val reminderManager = ReminderManager(application)
 
     init {
         // Sample data
@@ -44,14 +47,18 @@ class ChronosViewModel : ViewModel() {
                 )
             )
         )
+
+        // Schedule reminders for initial sample data
+        _items.forEach { reminderManager.scheduleReminder(it) }
     }
 
     fun addItem(item: TimelineItem) {
         _items.add(item)
-        scheduleReminder(item)
+        reminderManager.scheduleReminder(item)
     }
 
     fun removeItem(item: TimelineItem) {
+        reminderManager.cancelReminder(item)
         _items.remove(item)
     }
 
@@ -59,7 +66,7 @@ class ChronosViewModel : ViewModel() {
         val index = _items.indexOfFirst { it.id == updatedItem.id }
         if (index != -1) {
             _items[index] = updatedItem
-            scheduleReminder(updatedItem)
+            reminderManager.scheduleReminder(updatedItem)
         }
     }
 
@@ -67,7 +74,13 @@ class ChronosViewModel : ViewModel() {
         if (item is TimelineItem.Task) {
             val index = _items.indexOfFirst { it.id == item.id }
             if (index != -1) {
-                _items[index] = item.copy(isCompleted = !item.isCompleted)
+                val updated = item.copy(isCompleted = !item.isCompleted)
+                _items[index] = updated
+                if (updated.isCompleted) {
+                    reminderManager.cancelReminder(updated)
+                } else {
+                    reminderManager.scheduleReminder(updated)
+                }
             }
         }
     }
@@ -76,17 +89,17 @@ class ChronosViewModel : ViewModel() {
         itemIds.forEach { id ->
             val index = _items.indexOfFirst { it.id == id }
             if (index != -1) {
-                val item = _items[index]
-                _items[index] = when (item) {
+                val updatedItem = when (val item = _items[index]) {
                     is TimelineItem.Task -> item.copy(deadlineDate = newDate)
                     is TimelineItem.Event -> item.copy(date = newDate)
                 }
+                _items[index] = updatedItem
+                reminderManager.scheduleReminder(updatedItem)
             }
         }
     }
 
     fun getItemsForDate(date: LocalDate): List<TimelineItem> {
-        // Filter and Sort
         return _items.filter { item ->
             when (item) {
                 is TimelineItem.Task -> item.deadlineDate == date || item.date == date
@@ -105,13 +118,5 @@ class ChronosViewModel : ViewModel() {
                 }
             }
         )
-    }
-
-    private fun scheduleReminder(item: TimelineItem) {
-        val timeStr = when (item) {
-            is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.toString()
-            is TimelineItem.Task -> "Deadline: ${item.deadlineDate}"
-        }
-        Log.d("ChronosVM", "Reminder scheduled for ${item.title} at ${item.date} $timeStr")
     }
 }
