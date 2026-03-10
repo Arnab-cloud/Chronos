@@ -1,5 +1,7 @@
 package com.arnabcloud.chronos.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
@@ -10,8 +12,9 @@ sealed class TimelineItem {
     abstract val details: String
     abstract val date: LocalDate
 
+    @Entity(tableName = "tasks")
     data class Task(
-        override val id: UUID = UUID.randomUUID(),
+        @PrimaryKey override val id: UUID = UUID.randomUUID(),
         override val title: String,
         override val details: String = "",
         override val date: LocalDate = LocalDate.now(),
@@ -24,8 +27,9 @@ sealed class TimelineItem {
         fun isMissed(): Boolean = !isCompleted && deadlineDate?.isBefore(LocalDate.now()) == true
     }
 
+    @Entity(tableName = "events")
     data class Event(
-        override val id: UUID = UUID.randomUUID(),
+        @PrimaryKey override val id: UUID = UUID.randomUUID(),
         override val title: String,
         override val details: String = "",
         override val date: LocalDate = LocalDate.now(),

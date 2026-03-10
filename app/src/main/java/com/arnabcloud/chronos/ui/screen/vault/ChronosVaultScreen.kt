@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,7 +32,7 @@ private object VaultScreenDefaults {
 
 @Composable
 fun ChronosVaultScreen(viewModel: ChronosViewModel) {
-    val items = viewModel.items
+    val items by viewModel.items.collectAsState()
     var selectedItem by remember { mutableStateOf<TimelineItem?>(null) }
 
     Column(

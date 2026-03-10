@@ -36,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,12 +66,13 @@ import java.util.Locale
 
 @Composable
 fun ChronosCalendarScreen(viewModel: ChronosViewModel) {
+    val items by viewModel.items.collectAsState()
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val currentMonth = remember(selectedDate) { YearMonth.from(selectedDate) }
 
-    // Calculate busy days from ViewModel
-    val busyDays = remember(viewModel.items) {
-        viewModel.items.groupBy { it.date }.mapValues { entry ->
+    // Calculate busy days from ViewModel's state
+    val busyDays = remember(items) {
+        items.groupBy { it.date }.mapValues { entry ->
             entry.value.any { it is TimelineItem.Task && it.isMissed() } to entry.value.size
         }
     }
@@ -264,10 +266,12 @@ fun AgendaEventCard(item: TimelineItem.Event) {
         )
     ) {
         Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            Box(modifier = Modifier
-                .width(6.dp)
-                .fillMaxHeight()
-                .background(EventColor))
+            Box(
+                modifier = Modifier
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(EventColor)
+            )
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -360,9 +364,11 @@ fun AgendaTaskCard(
                 )
             }
 
-            Column(modifier = Modifier
-                .padding(vertical = 12.dp, horizontal = 8.dp)
-                .weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                    .weight(1f)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = item.title,

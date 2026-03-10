@@ -2,6 +2,8 @@ package com.arnabcloud.chronos.ui.screen.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -65,6 +67,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -104,6 +107,7 @@ const val HourSlotHeight = 100.0
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
+    val items by viewModel.items.collectAsState()
     var selectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
     var multiSelectMode by rememberSaveable { mutableStateOf(false) }
     val selectedItems = remember { mutableStateListOf<UUID>() }
@@ -130,13 +134,17 @@ fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (multiSelectMode) {
+        AnimatedVisibility(
+            visible = multiSelectMode,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
             ContextualTopAppBar(
                 selectionCount = selectedItems.size,
                 onClose = onClearSelection,
                 onDelete = {
                     selectedItems.toList().forEach { id ->
-                        viewModel.items.find { it.id == id }?.let { viewModel.removeItem(it) }
+                        items.find { it.id == id }?.let { viewModel.removeItem(it) }
                     }
                     onClearSelection()
                 },
@@ -272,7 +280,6 @@ fun DayPicker(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Timeline(
     modifier: Modifier = Modifier,
@@ -309,7 +316,6 @@ fun Timeline(
 
     BoxWithConstraints(modifier = modifier) {
         val viewportHeightPx = with(density) { maxHeight.toPx() }
-//        val hourSlotHeightPx = with(density) { HourSlotHeight.dp.toPx() }
         // Scroll to current hour only if today is selected
         LaunchedEffect(selectedDate) {
             if (selectedDate == LocalDate.now()) {
@@ -815,9 +821,11 @@ fun TaskCard(
                     modifier = Modifier.size(28.dp)
                 )
             }
-            Column(modifier = Modifier
-                .padding(vertical = 12.dp, horizontal = 8.dp)
-                .weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .padding(vertical = 12.dp, horizontal = 8.dp)
+                    .weight(1f)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = item.title,
