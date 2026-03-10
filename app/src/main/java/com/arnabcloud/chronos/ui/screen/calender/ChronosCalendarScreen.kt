@@ -1,4 +1,4 @@
-package com.arnabcloud.chronos.ui.calendar
+package com.arnabcloud.chronos.ui.screen.calender
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

@@ -10,16 +10,16 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
 
-class ChronosViewModel(application: Application) : AndroidViewModel(application) {
+class ChronosViewModel(applicationContext: Application) : AndroidViewModel(applicationContext) {
     private val _items = mutableStateListOf<TimelineItem>()
+    private val reminderManager = ReminderManager(context = applicationContext)
     val items: List<TimelineItem> get() = _items
 
-    private val reminderManager = ReminderManager(application)
 
     init {
         // Sample data
         _items.addAll(
-            listOf(
+            elements = listOf(
                 TimelineItem.Event(
                     title = "Design Sync",
                     startTime = LocalTime.of(10, 0),

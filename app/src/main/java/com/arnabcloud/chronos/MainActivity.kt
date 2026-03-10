@@ -48,19 +48,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.arnabcloud.chronos.ui.calendar.ChronosCalendarScreen
-import com.arnabcloud.chronos.ui.home.ChronosTimelineScreen
+import com.arnabcloud.chronos.ui.components.AddTaskDialog
+import com.arnabcloud.chronos.ui.screen.calender.ChronosCalendarScreen
+import com.arnabcloud.chronos.ui.screen.home.ChronosTimelineScreen
 import com.arnabcloud.chronos.ui.theme.ChronosTheme
-import com.arnabcloud.chronos.ui.vault.AddTaskDialog
-import com.arnabcloud.chronos.ui.vault.ChronosVaultScreen
+import com.arnabcloud.chronos.ui.screen.vault.ChronosVaultScreen
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
 import kotlinx.coroutines.launch
 
 // --- Navigation Routes ---
-sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
-    object Vault : Screen("vault", "Tasks", Icons.Default.Inventory2)
-    object Timeline : Screen("timeline", "Today", Icons.Default.Timeline)
-    object Calendar : Screen("calendar", "Plan", Icons.Default.CalendarMonth)
+sealed class Screen(val label: String, val icon: ImageVector) {
+    object Vault : Screen(label = "Tasks", icon = Icons.Default.Inventory2)
+    object Timeline : Screen(label = "Today", icon = Icons.Default.Timeline)
+    object Calendar : Screen(label = "Plan", icon = Icons.Default.CalendarMonth)
 }
 
 val bottomNavItems = listOf(
@@ -68,6 +68,12 @@ val bottomNavItems = listOf(
     Screen.Timeline,
     Screen.Calendar
 )
+
+sealed class DialogType {
+    object Task : DialogType()
+    object Event : DialogType()
+
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,7 +93,7 @@ fun RequestPermissions() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         val launcher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
-        ) { isGranted ->
+        ) { _ ->
             // Handle permission result if needed
         }
 
@@ -102,18 +108,16 @@ fun RequestPermissions() {
 fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
     val pagerState = rememberPagerState(pageCount = { bottomNavItems.size })
     val coroutineScope = rememberCoroutineScope()
+    var showSpeedDial by remember { mutableStateOf(value = false) }
+    var activeDialog by remember { mutableStateOf<DialogType?>(value = null) }
 
-    var showSpeedDial by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var isEventCreation by remember { mutableStateOf(false) }
-
-    if (showAddDialog) {
+    activeDialog?.let { dialogType ->
         AddTaskDialog(
-            isEvent = isEventCreation,
-            onDismiss = { showAddDialog = false },
+            isEvent = dialogType is DialogType.Event,
+            onDismiss = { activeDialog = null },
             onConfirm = { newItem ->
                 viewModel.addItem(newItem)
-                showAddDialog = false
+                activeDialog = null
             }
         )
     }
@@ -126,11 +130,11 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
                         selected = pagerState.currentPage == index,
                         onClick = {
                             coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
+                                pagerState.animateScrollToPage(page = index)
                             }
                         },
-                        label = { Text(screen.label) },
-                        icon = { Icon(screen.icon, contentDescription = null) }
+                        label = { Text(text = screen.label) },
+                        icon = { Icon(imageVector = screen.icon, contentDescription = null) }
                     )
                 }
             }
@@ -138,7 +142,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
         floatingActionButton = {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(space = 12.dp),
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 // Speed Dial Menu
@@ -149,27 +153,35 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(space = 12.dp)
                     ) {
                         ExtendedFloatingActionButton(
                             onClick = {
                                 showSpeedDial = false
-                                isEventCreation = true
-                                showAddDialog = true
+                                activeDialog = DialogType.Event
                             },
-                            icon = { Icon(Icons.Default.Event, contentDescription = null) },
-                            text = { Text("Full Event") },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.Event,
+                                    contentDescription = null
+                                )
+                            },
+                            text = { Text(text = "Full Event") },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         ExtendedFloatingActionButton(
                             onClick = {
                                 showSpeedDial = false
-                                isEventCreation = false
-                                showAddDialog = true
+                                activeDialog = DialogType.Task
                             },
-                            icon = { Icon(Icons.Default.AddTask, contentDescription = null) },
-                            text = { Text("Quick Task") },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.AddTask,
+                                    contentDescription = null
+                                )
+                            },
+                            text = { Text(text = "Quick Task") },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -184,7 +196,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
                     Icon(
-                        if (showSpeedDial) Icons.Default.Close else Icons.Default.Add,
+                        imageVector = if (showSpeedDial) Icons.Default.Close else Icons.Default.Add,
                         contentDescription = "New"
                     )
                 }
@@ -193,7 +205,7 @@ fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
     ) { innerPadding ->
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier.padding(paddingValues = innerPadding),
             userScrollEnabled = true
         ) { page ->
             when (bottomNavItems[page]) {

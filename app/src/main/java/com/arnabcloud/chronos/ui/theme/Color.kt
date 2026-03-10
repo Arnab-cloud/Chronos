@@ -24,12 +24,17 @@ val PriorityHighLight = Color(0xFFFFEBEE)
 val PriorityMediumLight = Color(0xFFFFF3E0)
 val PriorityLowLight = Color(0xFFE8F5E9)
 val EventColorLight = Color(0xFFE3F2FD)
+val EventContentLight = Color(0xFF0D47A1)
+val CompletedContainerLight = Color(0xFFF5F5F5)
 
 // Dark Theme Surface Colors
 val PriorityHighDark = Color(0xFF311B1B)
 val PriorityMediumDark = Color(0xFF332414)
 val PriorityLowDark = Color(0xFF142918)
 val EventColorDark = Color(0xFF102031)
+val EventContentDark = Color.White
+val CompletedContainerDark = Color(0xFF2C2C2C)
+val MissedContentDark = Color(0xFFFFCDD2)
 
 fun getPriorityColor(priority: Priority): Color = when (priority) {
     Priority.HIGH -> PriorityHigh

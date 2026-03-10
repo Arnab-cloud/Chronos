@@ -10,6 +10,14 @@ import com.arnabcloud.chronos.receiver.ReminderReceiver
 import java.time.LocalDateTime
 import java.time.ZoneId
 
+class AllDayDefaultTime {
+    // Notify at 9 AM for all-day events
+    companion object {
+        const val DEFAULT_HOUR = 9
+        const val DEFAULT_MINUTE = 0
+    }
+}
+
 class ReminderManager(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
@@ -63,7 +71,10 @@ class ReminderManager(private val context: Context) {
         return when (item) {
             is TimelineItem.Event -> {
                 if (item.isAllDay) {
-                    item.date.atTime(9, 0) // Notify at 9 AM for all-day events
+                    item.date.atTime(
+                        AllDayDefaultTime.DEFAULT_HOUR,
+                        AllDayDefaultTime.DEFAULT_MINUTE
+                    )
                 } else {
                     item.date.atTime(item.startTime)
                 }

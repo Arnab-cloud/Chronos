@@ -1,4 +1,4 @@
-package com.arnabcloud.chronos.ui.home
+package com.arnabcloud.chronos.ui.screen.home
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
