@@ -76,16 +76,16 @@ private object DetailDialogDefaults {
     val PADDING_MEDIUM = 8.dp
     val PADDING_LARGE = 16.dp
     val PADDING_XLARGE = 24.dp
-    
+
     val SPACING_SMALL = 8.dp
     val SPACING_MEDIUM = 12.dp
     val SPACING_LARGE = 16.dp
     val SPACING_XLARGE = 32.dp
-    
+
     val ICON_SIZE_SMALL = 16.dp
     val ICON_SIZE_MEDIUM = 18.dp
     val ICON_SIZE_LARGE = 20.dp
-    
+
     const val DIALOG_WIDTH_FRACTION = 0.9f
     const val DURATION_DIALOG_WIDTH_FRACTION = 0.85f
     const val TONAL_ELEVATION = 6
@@ -276,7 +276,10 @@ fun ItemDetailDialog(
                             Text(
                                 text = if (item is TimelineItem.Task) "TASK" else "EVENT",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-                                modifier = Modifier.padding(horizontal = DetailDialogDefaults.PADDING_MEDIUM, vertical = 2.dp)
+                                modifier = Modifier.padding(
+                                    horizontal = DetailDialogDefaults.PADDING_MEDIUM,
+                                    vertical = 2.dp
+                                )
                             )
                         }
                         Spacer(modifier = Modifier.height(DetailDialogDefaults.PADDING_SMALL))
@@ -408,7 +411,9 @@ fun ItemDetailDialog(
                 if (item is TimelineItem.Event) {
                     if (isEditing) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = editedIsAllDay, onCheckedChange = { editedIsAllDay = it })
+                            Checkbox(
+                                checked = editedIsAllDay,
+                                onCheckedChange = { editedIsAllDay = it })
                             Text("All day", style = MaterialTheme.typography.bodyMedium)
                         }
                         if (!editedIsAllDay) {
@@ -420,10 +425,22 @@ fun ItemDetailDialog(
                                         modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM)
                                     )
                                     Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
-                                    Text("Start: ${editedStartTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                    Text(
+                                        "Start: ${
+                                            editedStartTime.format(
+                                                DateTimeFormatter.ofPattern(
+                                                    "hh:mm a"
+                                                )
+                                            )
+                                        }"
+                                    )
                                 }
 
-                                Row(horizontalArrangement = Arrangement.spacedBy(DetailDialogDefaults.SPACING_SMALL)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(
+                                        DetailDialogDefaults.SPACING_SMALL
+                                    )
+                                ) {
                                     FilterChip(
                                         selected = !isDurationMode,
                                         onClick = { isDurationMode = false },
@@ -444,7 +461,16 @@ fun ItemDetailDialog(
                                             modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM)
                                         )
                                         Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
-                                        Text("Duration: ${formatDuration(Duration.between(editedStartTime, editedEndTime))}")
+                                        Text(
+                                            "Duration: ${
+                                                formatDuration(
+                                                    Duration.between(
+                                                        editedStartTime,
+                                                        editedEndTime
+                                                    )
+                                                )
+                                            }"
+                                        )
                                     }
                                 } else {
                                     TextButton(onClick = { showEndTimePicker = true }) {
@@ -454,7 +480,15 @@ fun ItemDetailDialog(
                                             modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM)
                                         )
                                         Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
-                                        Text("End: ${editedEndTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                        Text(
+                                            "End: ${
+                                                editedEndTime.format(
+                                                    DateTimeFormatter.ofPattern(
+                                                        "hh:mm a"
+                                                    )
+                                                )
+                                            }"
+                                        )
                                     }
                                 }
                             }
@@ -473,9 +507,17 @@ fun ItemDetailDialog(
                                 item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))
                             }"
                         }
-                        DetailRow(icon = Icons.Default.AccessTime, label = "Time", value = timeRange)
+                        DetailRow(
+                            icon = Icons.Default.AccessTime,
+                            label = "Time",
+                            value = timeRange
+                        )
                         item.location?.let {
-                            if (it.isNotBlank()) DetailRow(icon = Icons.Default.LocationOn, label = "Location", value = it)
+                            if (it.isNotBlank()) DetailRow(
+                                icon = Icons.Default.LocationOn,
+                                label = "Location",
+                                value = it
+                            )
                         }
                     }
                 }
@@ -510,7 +552,15 @@ fun ItemDetailDialog(
                                         modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM)
                                     )
                                     Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
-                                    Text("at ${editedDeadlineTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                                    Text(
+                                        "at ${
+                                            editedDeadlineTime?.format(
+                                                DateTimeFormatter.ofPattern(
+                                                    "hh:mm a"
+                                                )
+                                            ) ?: "None"
+                                        }"
+                                    )
                                 }
                             }
                         }
@@ -546,7 +596,13 @@ fun ItemDetailDialog(
                         }
                     } else {
                         item.deadlineDate?.let { it ->
-                            val timeStr = item.deadlineTime?.let { " at ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}" } ?: ""
+                            val timeStr = item.deadlineTime?.let {
+                                " at ${
+                                    it.format(
+                                        DateTimeFormatter.ofPattern("hh:mm a")
+                                    )
+                                }"
+                            } ?: ""
                             val isMissed = item.isMissed()
                             DetailRow(
                                 icon = Icons.Default.Flag,
@@ -633,7 +689,11 @@ fun ItemDetailDialog(
                             modifier = Modifier.weight(1f),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM))
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = null,
+                                modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM)
+                            )
                             Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
                             Text("Save Changes")
                         }
@@ -650,12 +710,16 @@ fun ItemDetailDialog(
 
                         TextButton(
                             onClick = onDelete,
-                            modifier = Modifier.weight(if (item is TimelineItem.Task) 0.5f else 1f),
+                            modifier = Modifier.weight(weight = if (item is TimelineItem.Task) 0.5f else 1f),
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(DetailDialogDefaults.ICON_SIZE_MEDIUM))
-                            Spacer(modifier = Modifier.width(DetailDialogDefaults.SPACING_SMALL))
-                            Text("Delete")
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(size = DetailDialogDefaults.ICON_SIZE_SMALL)
+                            )
+                            Spacer(modifier = Modifier.width(width = DetailDialogDefaults.SPACING_SMALL))
+                            Text(text = "Delete")
                         }
                     }
                 }

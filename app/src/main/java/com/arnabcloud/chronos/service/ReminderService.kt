@@ -1,0 +1,128 @@
+package com.arnabcloud.chronos.service
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.os.Build
+import android.os.IBinder
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import androidx.core.app.NotificationCompat
+import com.arnabcloud.chronos.MainActivity
+
+class ReminderService : Service() {
+    private var ringtone: Ringtone? = null
+    private var vibrator: Vibrator? = null
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val itemId = intent?.getStringExtra("ITEM_ID")
+        val itemTitle = intent?.getStringExtra("ITEM_TITLE") ?: "Chronos Reminder"
+        val itemType = intent?.getStringExtra("ITEM_TYPE") ?: "TASK"
+        val action = intent?.action
+
+        if (action == ACTION_STOP) {
+            stopAlarm()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        showNotification(itemId, itemTitle, itemType)
+        startAlarm()
+
+        return START_STICKY
+    }
+
+    private fun startAlarm() {
+        val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
+        ringtone = RingtoneManager.getRingtone(applicationContext, alarmUri)
+        ringtone?.play()
+
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager =
+                getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+
+        val pattern = longArrayOf(0, 500, 500)
+        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+    }
+
+    private fun stopAlarm() {
+        ringtone?.stop()
+        vibrator?.cancel()
+    }
+
+    private fun showNotification(itemId: String?, title: String, type: String) {
+        val channelId = "chronos_alarms"
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        val channel = NotificationChannel(
+            channelId,
+            "Chronos Alarms",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "Ongoing alarms for tasks and events"
+            setSound(null, null) // Sound is handled by the service
+            enableVibration(false) // Vibration is handled by the service
+        }
+        notificationManager.createNotificationChannel(channel)
+
+        val stopIntent = Intent(this, ReminderService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this,
+            0,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val fullScreenIntent = Intent(this, MainActivity::class.java).apply {
+            putExtra("SCROLL_TO_ITEM", itemId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            this,
+            itemId?.hashCode() ?: 0,
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle(if (type == "TASK") "Task Alarm" else "Event Alarm")
+            .setContentText(title)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
+            .build()
+
+        startForeground(NOTIFICATION_ID, notification)
+    }
+
+    override fun onDestroy() {
+        stopAlarm()
+        super.onDestroy()
+    }
+
+    companion object {
+        const val ACTION_STOP = "com.arnabcloud.chronos.STOP_ALARM"
+        const val NOTIFICATION_ID = 1001
+    }
+}
