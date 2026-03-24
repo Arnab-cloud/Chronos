@@ -2,7 +2,11 @@ package com.arnabcloud.chronos.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -26,22 +30,36 @@ class SettingsDataStore(private val context: Context) {
         val NOTIFICATION_TONE_KEY = stringPreferencesKey("notification_tone")
         val ALARM_TONE_KEY = stringPreferencesKey("alarm_tone")
         val SILENT_MODE_OVERRIDE_KEY = booleanPreferencesKey("silent_mode_override")
+        val PRE_REMINDER_ENABLED_KEY = booleanPreferencesKey("pre_reminder_enabled")
+        val PRE_REMINDER_TIME_KEY = intPreferencesKey("pre_reminder_time")
     }
 
     val themeFlow: Flow<String> = context.dataStore.data.map { it[THEME_KEY] ?: "System Default" }
     val layoutFlow: Flow<String> = context.dataStore.data.map { it[LAYOUT_KEY] ?: "Cards" }
     val animationsFlow: Flow<Boolean> = context.dataStore.data.map { it[ANIMATIONS_KEY] ?: true }
-    val compactModeFlow: Flow<Boolean> = context.dataStore.data.map { it[COMPACT_MODE_KEY] ?: false }
+    val compactModeFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[COMPACT_MODE_KEY] ?: false }
     val sortOrderFlow: Flow<String> = context.dataStore.data.map { it[SORT_ORDER_KEY] ?: "By Time" }
-    val vibrationEnabledFlow: Flow<Boolean> = context.dataStore.data.map { it[VIBRATION_ENABLED_KEY] ?: true }
-    val headsUpNotificationsFlow: Flow<Boolean> = context.dataStore.data.map { it[HEADS_UP_NOTIFICATIONS_KEY] ?: true }
+    val vibrationEnabledFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[VIBRATION_ENABLED_KEY] ?: true }
+    val headsUpNotificationsFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[HEADS_UP_NOTIFICATIONS_KEY] ?: true }
     val snoozeDurationFlow: Flow<Int> = context.dataStore.data.map { it[SNOOZE_DURATION_KEY] ?: 5 }
-    val repeatAlertsFlow: Flow<Boolean> = context.dataStore.data.map { it[REPEAT_ALERTS_KEY] ?: false }
-    val accentColorFlow: Flow<String> = context.dataStore.data.map { it[ACCENT_COLOR_KEY] ?: "Default" }
-    val reminderTypeFlow: Flow<String> = context.dataStore.data.map { it[REMINDER_TYPE_KEY] ?: "Notification" }
-    val notificationToneFlow: Flow<String> = context.dataStore.data.map { it[NOTIFICATION_TONE_KEY] ?: "" }
+    val repeatAlertsFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[REPEAT_ALERTS_KEY] ?: false }
+    val accentColorFlow: Flow<String> =
+        context.dataStore.data.map { it[ACCENT_COLOR_KEY] ?: "Default" }
+    val reminderTypeFlow: Flow<String> =
+        context.dataStore.data.map { it[REMINDER_TYPE_KEY] ?: "Notification" }
+    val notificationToneFlow: Flow<String> =
+        context.dataStore.data.map { it[NOTIFICATION_TONE_KEY] ?: "" }
     val alarmToneFlow: Flow<String> = context.dataStore.data.map { it[ALARM_TONE_KEY] ?: "" }
-    val silentModeOverrideFlow: Flow<Boolean> = context.dataStore.data.map { it[SILENT_MODE_OVERRIDE_KEY] ?: false }
+    val silentModeOverrideFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[SILENT_MODE_OVERRIDE_KEY] ?: false }
+    val preReminderEnabledFlow: Flow<Boolean> =
+        context.dataStore.data.map { it[PRE_REMINDER_ENABLED_KEY] ?: false }
+    val preReminderTimeFlow: Flow<Int> =
+        context.dataStore.data.map { it[PRE_REMINDER_TIME_KEY] ?: 10 }
 
     suspend fun setTheme(theme: String) {
         context.dataStore.edit { it[THEME_KEY] = theme }
@@ -97,5 +115,13 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setSilentModeOverride(enabled: Boolean) {
         context.dataStore.edit { it[SILENT_MODE_OVERRIDE_KEY] = enabled }
+    }
+
+    suspend fun setPreReminderEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[PRE_REMINDER_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setPreReminderTime(minutes: Int) {
+        context.dataStore.edit { it[PRE_REMINDER_TIME_KEY] = minutes }
     }
 }

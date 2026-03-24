@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Announcement
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.FormatSize
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.ViewStream
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,11 +69,15 @@ fun SettingsScreen(
     val notificationTone by viewModel.notificationTone.collectAsState()
     val alarmTone by viewModel.alarmTone.collectAsState()
 
+    val preReminderEnabled by viewModel.preReminderEnabled.collectAsState()
+    val preReminderTime by viewModel.preReminderTime.collectAsState()
+
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLayoutDialog by remember { mutableStateOf(false) }
     var showSortDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
     var showAccentColorDialog by remember { mutableStateOf(false) }
+    var showPreReminderDialog by remember { mutableStateOf(false) }
 
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -189,6 +195,25 @@ fun SettingsScreen(
                     checked = silentModeOverride,
                     onCheckedChange = { viewModel.setSilentModeOverride(it) }
                 )
+            }
+            item {
+                SettingsSwitchItem(
+                    title = "Early Reminder",
+                    subtitle = "Get notified before the actual task",
+                    icon = Icons.Default.Timer,
+                    checked = preReminderEnabled,
+                    onCheckedChange = { viewModel.setPreReminderEnabled(it) }
+                )
+            }
+            if (preReminderEnabled) {
+                item {
+                    SettingsItem(
+                        title = "Remind me early by",
+                        subtitle = "$preReminderTime minutes",
+                        icon = Icons.Default.AccessTime,
+                        onClick = { showPreReminderDialog = true }
+                    )
+                }
             }
             item {
                 SettingsItem(
@@ -331,6 +356,17 @@ fun SettingsScreen(
             onSelect = {
                 viewModel.setSnoozeDuration(it)
                 showSnoozeDialog = false
+            }
+        )
+    }
+
+    if (showPreReminderDialog) {
+        PreReminderSelectionDialog(
+            currentMinutes = preReminderTime,
+            onDismiss = { showPreReminderDialog = false },
+            onSelect = {
+                viewModel.setPreReminderTime(it)
+                showPreReminderDialog = false
             }
         )
     }
