@@ -22,7 +22,9 @@ class SettingsDataStore(private val context: Context) {
         val SNOOZE_DURATION_KEY = intPreferencesKey("snooze_duration")
         val REPEAT_ALERTS_KEY = booleanPreferencesKey("repeat_alerts")
         val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")
-        val REMINDER_TONE_KEY = stringPreferencesKey("reminder_tone")
+        val REMINDER_TYPE_KEY = stringPreferencesKey("reminder_type")
+        val NOTIFICATION_TONE_KEY = stringPreferencesKey("notification_tone")
+        val ALARM_TONE_KEY = stringPreferencesKey("alarm_tone")
         val SILENT_MODE_OVERRIDE_KEY = booleanPreferencesKey("silent_mode_override")
     }
 
@@ -36,7 +38,9 @@ class SettingsDataStore(private val context: Context) {
     val snoozeDurationFlow: Flow<Int> = context.dataStore.data.map { it[SNOOZE_DURATION_KEY] ?: 5 }
     val repeatAlertsFlow: Flow<Boolean> = context.dataStore.data.map { it[REPEAT_ALERTS_KEY] ?: false }
     val accentColorFlow: Flow<String> = context.dataStore.data.map { it[ACCENT_COLOR_KEY] ?: "Default" }
-    val reminderToneFlow: Flow<String> = context.dataStore.data.map { it[REMINDER_TONE_KEY] ?: "" }
+    val reminderTypeFlow: Flow<String> = context.dataStore.data.map { it[REMINDER_TYPE_KEY] ?: "Notification" }
+    val notificationToneFlow: Flow<String> = context.dataStore.data.map { it[NOTIFICATION_TONE_KEY] ?: "" }
+    val alarmToneFlow: Flow<String> = context.dataStore.data.map { it[ALARM_TONE_KEY] ?: "" }
     val silentModeOverrideFlow: Flow<Boolean> = context.dataStore.data.map { it[SILENT_MODE_OVERRIDE_KEY] ?: false }
 
     suspend fun setTheme(theme: String) {
@@ -79,8 +83,16 @@ class SettingsDataStore(private val context: Context) {
         context.dataStore.edit { it[ACCENT_COLOR_KEY] = color }
     }
 
-    suspend fun setReminderTone(toneUri: String) {
-        context.dataStore.edit { it[REMINDER_TONE_KEY] = toneUri }
+    suspend fun setReminderType(type: String) {
+        context.dataStore.edit { it[REMINDER_TYPE_KEY] = type }
+    }
+
+    suspend fun setNotificationTone(toneUri: String) {
+        context.dataStore.edit { it[NOTIFICATION_TONE_KEY] = toneUri }
+    }
+
+    suspend fun setAlarmTone(toneUri: String) {
+        context.dataStore.edit { it[ALARM_TONE_KEY] = toneUri }
     }
 
     suspend fun setSilentModeOverride(enabled: Boolean) {

@@ -46,7 +46,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val silentModeOverride: StateFlow<Boolean> = settingsDataStore.silentModeOverrideFlow.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), false
     )
-    val reminderTone: StateFlow<String> = settingsDataStore.reminderToneFlow.stateIn(
+    val reminderType: StateFlow<String> = settingsDataStore.reminderTypeFlow.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), "Notification"
+    )
+    val notificationTone: StateFlow<String> = settingsDataStore.notificationToneFlow.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), ""
+    )
+    val alarmTone: StateFlow<String> = settingsDataStore.alarmToneFlow.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), ""
     )
 
@@ -79,6 +85,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setSilentModeOverride(enabled: Boolean) =
         viewModelScope.launch { settingsDataStore.setSilentModeOverride(enabled) }
 
-    fun setReminderTone(toneUri: String) =
-        viewModelScope.launch { settingsDataStore.setReminderTone(toneUri) }
+    fun setReminderType(type: String) =
+        viewModelScope.launch { settingsDataStore.setReminderType(type) }
+
+    fun setNotificationTone(toneUri: String) =
+        viewModelScope.launch { settingsDataStore.setNotificationTone(toneUri) }
+
+    fun setAlarmTone(toneUri: String) =
+        viewModelScope.launch { settingsDataStore.setAlarmTone(toneUri) }
 }

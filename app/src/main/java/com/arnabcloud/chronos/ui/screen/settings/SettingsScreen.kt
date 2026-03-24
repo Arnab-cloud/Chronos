@@ -62,7 +62,10 @@ fun SettingsScreen(
     val repeatAlerts by viewModel.repeatAlerts.collectAsState()
     val accentColor by viewModel.accentColor.collectAsState()
     val silentModeOverride by viewModel.silentModeOverride.collectAsState()
-    val reminderTone by viewModel.reminderTone.collectAsState()
+
+    val reminderType by viewModel.reminderType.collectAsState()
+    val notificationTone by viewModel.notificationTone.collectAsState()
+    val alarmTone by viewModel.alarmTone.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLayoutDialog by remember { mutableStateOf(false) }
@@ -76,18 +79,28 @@ fun SettingsScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             val data = result.data
             val uri = data?.let {
-                IntentCompat.getParcelableExtra(it, RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+                IntentCompat.getParcelableExtra(
+                    it,
+                    RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                    Uri::class.java
+                )
             }
-            viewModel.setReminderTone(uri?.toString() ?: "")
+            if (reminderType == "Alarm") {
+                viewModel.setAlarmTone(uri?.toString() ?: "")
+            } else {
+                viewModel.setNotificationTone(uri?.toString() ?: "")
+            }
         }
     }
 
-    val reminderToneTitle = remember(reminderTone) {
-        if (reminderTone.isEmpty()) {
+    val currentToneUri = if (reminderType == "Alarm") alarmTone else notificationTone
+
+    val toneTitle = remember(currentToneUri) {
+        if (currentToneUri.isEmpty()) {
             "Default"
         } else {
             try {
-                RingtoneManager.getRingtone(context, reminderTone.toUri())?.getTitle(context)
+                RingtoneManager.getRingtone(context, currentToneUri.toUri())?.getTitle(context)
                     ?: "Unknown"
             } catch (_: Exception) {
                 "Default"
@@ -112,68 +125,36 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // --- Appearance ---
-            item { SettingsCategoryHeader(title = "Appearance") }
-            item {
-                SettingsItem(
-                    title = "Theme",
-                    subtitle = theme,
-                    icon = Icons.Default.Palette,
-                    onClick = { showThemeDialog = true }
-                )
-            }
-            item {
-                SettingsItem(
-                    title = "Accent Color",
-                    subtitle = accentColor,
-                    icon = Icons.Default.ColorLens,
-                    onClick = { showAccentColorDialog = true }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = "Compact Mode",
-                    subtitle = "Reduce spacing and font size",
-                    icon = Icons.Default.FormatSize,
-                    checked = compactModeEnabled,
-                    onCheckedChange = { viewModel.setCompactMode(it) }
-                )
-            }
-            item {
-                SettingsItem(
-                    title = "List Layout",
-                    subtitle = layout,
-                    icon = Icons.Default.ViewStream,
-                    onClick = { showLayoutDialog = true }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = "Animations",
-                    subtitle = "Enable UI transitions",
-                    icon = Icons.Default.Animation,
-                    checked = animationsEnabled,
-                    onCheckedChange = { viewModel.setAnimations(it) }
-                )
-            }
-
             // --- Notifications ---
             item { SettingsCategoryHeader(title = "Notifications") }
             item {
+                SettingsSwitchItem(
+                    title = "Alarm Mode",
+                    subtitle = if (reminderType == "Alarm") "Reminders will play like an alarm" else "Reminders will show as normal notifications",
+                    icon = Icons.Default.Notifications,
+                    checked = reminderType == "Alarm",
+                    onCheckedChange = { isAlarm ->
+                        viewModel.setReminderType(if (isAlarm) "Alarm" else "Notification")
+                    }
+                )
+            }
+            item {
                 SettingsItem(
-                    title = "Reminder Tone",
-                    subtitle = reminderToneTitle,
+                    title = if (reminderType == "Alarm") "Alarm Tone" else "Notification Tone",
+                    subtitle = toneTitle,
                     icon = Icons.Default.Notifications,
                     onClick = {
+                        val type =
+                            if (reminderType == "Alarm") RingtoneManager.TYPE_ALARM else RingtoneManager.TYPE_NOTIFICATION
                         val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, type)
                             putExtra(
-                                RingtoneManager.EXTRA_RINGTONE_TYPE,
-                                RingtoneManager.TYPE_NOTIFICATION
+                                RingtoneManager.EXTRA_RINGTONE_TITLE,
+                                if (reminderType == "Alarm") "Select Alarm Tone" else "Select Notification Tone"
                             )
-                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Reminder Tone")
                             putExtra(
                                 RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                if (reminderTone.isNotEmpty()) reminderTone.toUri() else null
+                                if (currentToneUri.isNotEmpty()) currentToneUri.toUri() else null
                             )
                             putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
                             putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
@@ -248,6 +229,51 @@ fun SettingsScreen(
                     subtitle = sortOrder,
                     icon = Icons.AutoMirrored.Filled.Sort,
                     onClick = { showSortDialog = true }
+                )
+            }
+
+            // --- Appearance ---
+            item { SettingsCategoryHeader(title = "Appearance") }
+            item {
+                SettingsItem(
+                    title = "Theme",
+                    subtitle = theme,
+                    icon = Icons.Default.Palette,
+                    onClick = { showThemeDialog = true }
+                )
+            }
+            item {
+                SettingsItem(
+                    title = "Accent Color",
+                    subtitle = accentColor,
+                    icon = Icons.Default.ColorLens,
+                    onClick = { showAccentColorDialog = true }
+                )
+            }
+            item {
+                SettingsSwitchItem(
+                    title = "Compact Mode",
+                    subtitle = "Reduce spacing and font size",
+                    icon = Icons.Default.FormatSize,
+                    checked = compactModeEnabled,
+                    onCheckedChange = { viewModel.setCompactMode(it) }
+                )
+            }
+            item {
+                SettingsItem(
+                    title = "List Layout",
+                    subtitle = layout,
+                    icon = Icons.Default.ViewStream,
+                    onClick = { showLayoutDialog = true }
+                )
+            }
+            item {
+                SettingsSwitchItem(
+                    title = "Animations",
+                    subtitle = "Enable UI transitions",
+                    icon = Icons.Default.Animation,
+                    checked = animationsEnabled,
+                    onCheckedChange = { viewModel.setAnimations(it) }
                 )
             }
         }
