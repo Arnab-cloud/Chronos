@@ -1,12 +1,13 @@
 package com.arnabcloud.chronos.ui.screen.settings
 
+import android.app.Activity
 import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -24,14 +25,11 @@ import androidx.compose.material.icons.filled.SettingsSuggest
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.ViewStream
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,10 +37,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arnabcloud.chronos.viewmodel.SettingsViewModel
 
@@ -64,12 +61,36 @@ fun SettingsScreen(
     val repeatAlerts by viewModel.repeatAlerts.collectAsState()
     val accentColor by viewModel.accentColor.collectAsState()
     val silentModeOverride by viewModel.silentModeOverride.collectAsState()
+    val reminderTone by viewModel.reminderTone.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLayoutDialog by remember { mutableStateOf(false) }
     var showSortDialog by remember { mutableStateOf(false) }
     var showSnoozeDialog by remember { mutableStateOf(false) }
     var showAccentColorDialog by remember { mutableStateOf(false) }
+
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri =
+                result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            viewModel.setReminderTone(uri?.toString() ?: "")
+        }
+    }
+
+    val reminderToneTitle = remember(reminderTone) {
+        if (reminderTone.isEmpty()) {
+            "Default"
+        } else {
+            try {
+                RingtoneManager.getRingtone(context, reminderTone.toUri())?.getTitle(context)
+                    ?: "Unknown"
+            } catch (_: Exception) {
+                "Default"
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -138,9 +159,24 @@ fun SettingsScreen(
             item {
                 SettingsItem(
                     title = "Reminder Tone",
-                    subtitle = "Default",
+                    subtitle = reminderToneTitle,
                     icon = Icons.Default.Notifications,
-                    onClick = { /* Tone picker placeholder */ }
+                    onClick = {
+                        val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                RingtoneManager.TYPE_NOTIFICATION
+                            )
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Reminder Tone")
+                            putExtra(
+                                RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                if (reminderTone.isNotEmpty()) reminderTone.toUri() else null
+                            )
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                            putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                        }
+                        ringtonePickerLauncher.launch(intent)
+                    }
                 )
             }
             item {
@@ -269,171 +305,4 @@ fun SettingsScreen(
             }
         )
     }
-}
-
-@Composable
-fun AccentColorSelectionDialog(
-    currentColor: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    val colors = listOf("Default", "Blue", "Green", "Red", "Orange", "Purple")
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Choose Accent Color") },
-        text = {
-            Column {
-                colors.forEach { colorName ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(colorName) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (colorName == currentColor),
-                            onClick = { onSelect(colorName) }
-                        )
-                        Text(text = colorName, modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun ThemeSelectionDialog(
-    currentTheme: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Choose Theme") },
-        text = {
-            Column {
-                listOf("Light", "Dark", "System Default").forEach { theme ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(theme) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (theme == currentTheme),
-                            onClick = { onSelect(theme) }
-                        )
-                        Text(text = theme, modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun LayoutSelectionDialog(
-    currentLayout: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("List Layout") },
-        text = {
-            Column {
-                listOf("Cards", "Compact List").forEach { layout ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(layout) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (layout == currentLayout),
-                            onClick = { onSelect(layout) }
-                        )
-                        Text(text = layout, modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun SortSelectionDialog(
-    currentSort: String,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Sort Order") },
-        text = {
-            Column {
-                listOf("By Time", "By Priority", "By Creation Date").forEach { sort ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(sort) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (sort == currentSort),
-                            onClick = { onSelect(sort) }
-                        )
-                        Text(text = sort, modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@Composable
-fun SnoozeSelectionDialog(
-    currentDuration: Int,
-    onDismiss: () -> Unit,
-    onSelect: (Int) -> Unit
-) {
-    val options = listOf(5, 10, 15, 30, 60)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Default Snooze Duration") },
-        text = {
-            Column {
-                options.forEach { minutes ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(minutes) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (minutes == currentDuration),
-                            onClick = { onSelect(minutes) }
-                        )
-                        Text(text = "$minutes minutes", modifier = Modifier.padding(start = 8.dp))
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
 }
