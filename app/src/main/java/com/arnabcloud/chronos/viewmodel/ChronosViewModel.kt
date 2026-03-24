@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.arnabcloud.chronos.data.ChronosDatabase
 import com.arnabcloud.chronos.data.ChronosRepository
+import com.arnabcloud.chronos.data.SettingsDataStore
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.util.ReminderManager
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,6 +20,7 @@ import java.util.UUID
 class ChronosViewModel(applicationContext: Application) : AndroidViewModel(applicationContext) {
     private val repository: ChronosRepository
     private val reminderManager = ReminderManager(context = applicationContext)
+    private val settingsDataStore = SettingsDataStore(applicationContext)
 
     val items: StateFlow<List<TimelineItem>>
 
@@ -26,29 +28,41 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
         val dao = ChronosDatabase.getDatabase(applicationContext).chronosDao()
         repository = ChronosRepository(dao)
 
-        // Combine Tasks and Events into a single list of TimelineItems
-        items = combine(repository.allTasks, repository.allEvents) { tasks, events ->
-            (tasks + events).sortedWith(
-                compareBy<TimelineItem> {
-                    it.date
-                }.thenBy {
-                    when (it) {
-                        is TimelineItem.Event -> if (it.isAllDay) 0 else 1
-                        is TimelineItem.Task -> 2
+        // Combine Tasks and Events into a single list of TimelineItems with dynamic sorting
+        items = combine(
+            repository.allTasks,
+            repository.allEvents,
+            settingsDataStore.sortOrderFlow
+        ) { tasks, events, sortOrder ->
+            val allItems = tasks + events
+            when (sortOrder) {
+                "By Priority" -> allItems.sortedWith(
+                    compareByDescending<TimelineItem> {
+                        if (it is TimelineItem.Task) it.priority.ordinal else -1
+                    }.thenBy { it.date }
+                )
+
+                "By Creation Date" -> allItems.sortedBy { it.id.timestamp() } // UUID v7 if used, otherwise fallback
+                "By Time" -> allItems.sortedWith(
+                    compareBy<TimelineItem> { it.date }.thenBy {
+                        when (it) {
+                            is TimelineItem.Event -> it.startTime
+                            is TimelineItem.Task -> it.taskTime ?: LocalTime.MAX
+                        }
                     }
-                }.thenBy {
-                    when (it) {
-                        is TimelineItem.Event -> it.startTime
-                        is TimelineItem.Task -> LocalTime.MAX
-                    }
-                }
-            )
+                )
+
+                else -> allItems.sortedBy { it.date }
+            }
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
     }
+
+    // Fallback for non-v7 UUIDs to sort by "creation" (simplified)
+    private fun UUID.timestamp(): Long = this.mostSignificantBits
 
     fun addItem(item: TimelineItem) {
         viewModelScope.launch {

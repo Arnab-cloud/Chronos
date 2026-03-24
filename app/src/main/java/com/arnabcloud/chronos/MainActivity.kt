@@ -4,45 +4,21 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddTask
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,9 +27,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arnabcloud.chronos.ui.components.AddTaskDialog
 import com.arnabcloud.chronos.ui.screen.calender.ChronosCalendarScreen
 import com.arnabcloud.chronos.ui.screen.home.ChronosTimelineScreen
-import com.arnabcloud.chronos.ui.theme.ChronosTheme
+import com.arnabcloud.chronos.ui.screen.settings.AboutScreen
+import com.arnabcloud.chronos.ui.screen.settings.SettingsScreen
 import com.arnabcloud.chronos.ui.screen.vault.ChronosVaultScreen
+import com.arnabcloud.chronos.ui.theme.ChronosTheme
 import com.arnabcloud.chronos.viewmodel.ChronosViewModel
+import com.arnabcloud.chronos.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 
 // --- Navigation Routes ---
@@ -72,7 +51,11 @@ val bottomNavItems = listOf(
 sealed class DialogType {
     object Task : DialogType()
     object Event : DialogType()
+}
 
+sealed class ActiveSettingsScreen {
+    object Main : ActiveSettingsScreen()
+    object About : ActiveSettingsScreen()
 }
 
 class MainActivity : ComponentActivity() {
@@ -80,9 +63,24 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ChronosTheme {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val themePreference by settingsViewModel.theme.collectAsState()
+            val compactMode by settingsViewModel.compactModeEnabled.collectAsState()
+            val accentColor by settingsViewModel.accentColor.collectAsState()
+
+            val darkTheme = when (themePreference) {
+                "Light" -> false
+                "Dark" -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            ChronosTheme(
+                darkTheme = darkTheme,
+                compactMode = compactMode,
+                accentColor = accentColor
+            ) {
                 RequestPermissions()
-                MainNavigation()
+                MainNavigation(settingsViewModel = settingsViewModel)
             }
         }
     }
@@ -105,113 +103,185 @@ fun RequestPermissions() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainNavigation(viewModel: ChronosViewModel = viewModel()) {
+fun MainNavigation(
+    chronosViewModel: ChronosViewModel = viewModel(),
+    settingsViewModel: SettingsViewModel = viewModel()
+) {
     val pagerState = rememberPagerState(pageCount = { bottomNavItems.size })
     val coroutineScope = rememberCoroutineScope()
-    var showSpeedDial by remember { mutableStateOf(value = false) }
-    var activeDialog by remember { mutableStateOf<DialogType?>(value = null) }
+    var showSpeedDial by remember { mutableStateOf(false) }
+    var activeDialog by remember { mutableStateOf<DialogType?>(null) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var activeSettingsScreen by remember { mutableStateOf<ActiveSettingsScreen?>(null) }
+    val animationsEnabled by settingsViewModel.animationsEnabled.collectAsState()
+
+    when (activeSettingsScreen) {
+        ActiveSettingsScreen.Main -> {
+            BackHandler { activeSettingsScreen = null }
+            SettingsScreen(
+                onBackClick = { activeSettingsScreen = null },
+                viewModel = settingsViewModel
+            )
+            return
+        }
+        ActiveSettingsScreen.About -> {
+            BackHandler { activeSettingsScreen = null }
+            AboutScreen(onBackClick = { activeSettingsScreen = null })
+            return
+        }
+        null -> { /* Continue to main UI */ }
+    }
 
     activeDialog?.let { dialogType ->
         AddTaskDialog(
             isEvent = dialogType is DialogType.Event,
             onDismiss = { activeDialog = null },
             onConfirm = { newItem ->
-                viewModel.addItem(newItem)
+                chronosViewModel.addItem(newItem)
                 activeDialog = null
             }
         )
     }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                bottomNavItems.forEachIndexed { index, screen ->
-                    NavigationBarItem(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(page = index)
-                            }
-                        },
-                        label = { Text(text = screen.label) },
-                        icon = { Icon(imageVector = screen.icon, contentDescription = null) }
-                    )
-                }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Chronos",
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                HorizontalDivider()
+                NavigationDrawerItem(
+                    label = { Text("Settings") },
+                    selected = activeSettingsScreen is ActiveSettingsScreen.Main,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            activeSettingsScreen = ActiveSettingsScreen.Main
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+                NavigationDrawerItem(
+                    label = { Text("About") },
+                    selected = activeSettingsScreen is ActiveSettingsScreen.About,
+                    onClick = {
+                        coroutineScope.launch {
+                            drawerState.close()
+                            activeSettingsScreen = ActiveSettingsScreen.About
+                        }
+                    },
+                    icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
             }
-        },
-        floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(space = 12.dp),
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                // Speed Dial Menu
-                AnimatedVisibility(
-                    visible = showSpeedDial,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(space = 12.dp)
-                    ) {
-                        ExtendedFloatingActionButton(
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(bottomNavItems[pagerState.currentPage].label) },
+                    actions = {
+                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Menu")
+                        }
+                    }
+                )
+            },
+            bottomBar = {
+                NavigationBar {
+                    bottomNavItems.forEachIndexed { index, screen ->
+                        NavigationBarItem(
+                            selected = pagerState.currentPage == index,
                             onClick = {
-                                showSpeedDial = false
-                                activeDialog = DialogType.Event
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(page = index)
+                                }
                             },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Default.Event,
-                                    contentDescription = null
-                                )
-                            },
-                            text = { Text(text = "Full Event") },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                        ExtendedFloatingActionButton(
-                            onClick = {
-                                showSpeedDial = false
-                                activeDialog = DialogType.Task
-                            },
-                            icon = {
-                                Icon(
-                                    imageVector = Icons.Default.AddTask,
-                                    contentDescription = null
-                                )
-                            },
-                            text = { Text(text = "Quick Task") },
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            label = { Text(text = screen.label) },
+                            icon = { Icon(imageVector = screen.icon, contentDescription = null) }
                         )
                     }
                 }
-
-                // Main FAB
-                FloatingActionButton(
-                    onClick = { showSpeedDial = !showSpeedDial },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+            },
+            floatingActionButton = {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(space = 12.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
-                    Icon(
-                        imageVector = if (showSpeedDial) Icons.Default.Close else Icons.Default.Add,
-                        contentDescription = "New"
-                    )
+                    // Speed Dial Menu
+                    AnimatedVisibility(
+                        visible = showSpeedDial,
+                        enter = if (animationsEnabled) fadeIn() + expandVertically() else EnterTransition.None,
+                        exit = if (animationsEnabled) fadeOut() + shrinkVertically() else ExitTransition.None
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(space = 12.dp)
+                        ) {
+                            ExtendedFloatingActionButton(
+                                onClick = {
+                                    showSpeedDial = false
+                                    activeDialog = DialogType.Event
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Event,
+                                        contentDescription = null
+                                    )
+                                },
+                                text = { Text(text = "Full Event") },
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            ExtendedFloatingActionButton(
+                                onClick = {
+                                    showSpeedDial = false
+                                    activeDialog = DialogType.Task
+                                },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Default.AddTask,
+                                        contentDescription = null
+                                    )
+                                },
+                                text = { Text(text = "Quick Task") },
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+
+                    // Main FAB
+                    FloatingActionButton(
+                        onClick = { showSpeedDial = !showSpeedDial },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(
+                            imageVector = if (showSpeedDial) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = "New"
+                        )
+                    }
                 }
             }
-        }
-    ) { innerPadding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.padding(paddingValues = innerPadding),
-            userScrollEnabled = true
-        ) { page ->
-            when (bottomNavItems[page]) {
-                Screen.Vault -> ChronosVaultScreen(viewModel)
-                Screen.Timeline -> ChronosTimelineScreen(viewModel)
-                Screen.Calendar -> ChronosCalendarScreen(viewModel)
+        ) { innerPadding ->
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.padding(paddingValues = innerPadding),
+                userScrollEnabled = true
+            ) { page ->
+                when (bottomNavItems[page]) {
+                    Screen.Vault -> ChronosVaultScreen(chronosViewModel)
+                    Screen.Timeline -> ChronosTimelineScreen(chronosViewModel)
+                    Screen.Calendar -> ChronosCalendarScreen(chronosViewModel)
+                }
             }
         }
     }

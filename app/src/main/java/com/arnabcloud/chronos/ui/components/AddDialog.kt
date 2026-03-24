@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
@@ -45,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -52,7 +56,6 @@ import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.ui.theme.EventColor
 import com.arnabcloud.chronos.ui.theme.getPriorityColor
-//import com.arnabcloud.chronos.ui.screen.vault.DurationPickerDialog
 import com.arnabcloud.chronos.util.formatDuration
 import java.time.Duration
 import java.time.Instant
@@ -60,6 +63,19 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+
+@Preview
+@Composable
+fun PreviewDialog() {
+
+    AddTaskDialog(
+        isEvent = false,
+        onDismiss = {},
+        onConfirm = {}
+    )
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -75,7 +91,7 @@ fun AddTaskDialog(
     var startTime by remember { mutableStateOf(LocalTime.now()) }
     var endTime by remember { mutableStateOf(LocalTime.now().plusHours(1)) }
     var deadlineDate by remember { mutableStateOf<LocalDate?>(null) }
-    var priority by remember { mutableStateOf(Priority.MEDIUM) }
+    var priority by remember { mutableStateOf(Priority.LOW) }
     var taskTime by remember { mutableStateOf<LocalTime?>(null) }
     var deadlineTime by remember { mutableStateOf<LocalTime?>(null) }
 
@@ -273,11 +289,13 @@ fun AddTaskDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false
+        )
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.9f)
+                .fillMaxWidth(0.95f)
                 .padding(16.dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surface,
@@ -285,7 +303,7 @@ fun AddTaskDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
                     .fillMaxWidth()
             ) {
                 // Header Row
@@ -307,10 +325,9 @@ fun AddTaskDialog(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = if (isEvent) "Create Event" else "Create Task",
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -320,36 +337,48 @@ fun AddTaskDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
 
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 400.dp) // Constrain max height but let it wrap content
+                        .verticalScroll(state = rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(space = 8.dp)
+                ) {
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Title") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = details,
                         onValueChange = { details = it },
-                        label = { Text("Details") },
-                        modifier = Modifier.fillMaxWidth()
+                        label = { Text(text = "Details") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 100.dp)
                     )
 
-                    Row {
+                    Row(horizontalArrangement = Arrangement.spacedBy(space = 8.dp)) {
                         TextButton(
                             onClick = { showDatePicker = true },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(weight = 1f)
                         ) {
                             Icon(
-                                Icons.Default.CalendarToday,
+                                imageVector = Icons.Default.CalendarToday,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(size = 18.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd"))}")
+                            Spacer(modifier = Modifier.width(width = 4.dp))
+                            Text(
+                                text = "Date: ${date.format(DateTimeFormatter.ofPattern("MMM dd"))}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                         if (!isEvent) {
                             TextButton(
@@ -361,40 +390,63 @@ fun AddTaskDialog(
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Time: ${taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Time: ${taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     }
 
                     if (isEvent) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = isAllDay, onCheckedChange = { isAllDay = it })
-                            Text("All day", style = MaterialTheme.typography.bodyMedium)
+                            Checkbox(
+                                checked = isAllDay,
+                                onCheckedChange = { isAllDay = it },
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("All day", style = MaterialTheme.typography.bodySmall)
                         }
 
                         if (!isAllDay) {
-                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 TextButton(onClick = { showStartTimePicker = true }) {
                                     Icon(
                                         Icons.Default.AccessTime,
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Start: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        "Start: ${startTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(
                                         selected = !isDurationMode,
                                         onClick = { isDurationMode = false },
-                                        label = { Text("End Time") }
+                                        label = {
+                                            Text(
+                                                "End Time",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        modifier = Modifier.height(28.dp)
                                     )
                                     FilterChip(
                                         selected = isDurationMode,
                                         onClick = { isDurationMode = true },
-                                        label = { Text("Duration") }
+                                        label = {
+                                            Text(
+                                                "Duration",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        },
+                                        modifier = Modifier.height(28.dp)
                                     )
                                 }
 
@@ -405,7 +457,7 @@ fun AddTaskDialog(
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             "Duration: ${
                                                 formatDuration(
@@ -414,7 +466,8 @@ fun AddTaskDialog(
                                                         endTime
                                                     )
                                                 )
-                                            }"
+                                            }",
+                                            style = MaterialTheme.typography.bodySmall
                                         )
                                     }
                                 } else {
@@ -424,14 +477,17 @@ fun AddTaskDialog(
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("End: ${endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            "End: ${endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
                                     }
                                 }
                             }
                         }
                     } else {
-                        Row {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(
                                 onClick = { showDeadlinePicker = true },
                                 modifier = Modifier.weight(1f)
@@ -441,44 +497,60 @@ fun AddTaskDialog(
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    if (deadlineDate == null) "Add Deadline" else "Due: ${
+                                    if (deadlineDate == null) "Deadline" else "Due: ${
                                         deadlineDate?.format(
                                             DateTimeFormatter.ofPattern("MMM dd")
                                         )
-                                    }"
+                                    }",
+                                    style = MaterialTheme.typography.bodySmall
                                 )
                             }
                             if (deadlineDate != null) {
                                 TextButton(
                                     onClick = { showDeadlineTimePicker = true },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(weight = 1f)
                                 ) {
                                     Icon(
-                                        Icons.Default.AccessTime,
+                                        imageVector = Icons.Default.AccessTime,
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(size = 18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("at ${deadlineTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "None"}")
+                                    Spacer(modifier = Modifier.width(width = 4.dp))
+                                    Text(
+                                        text = deadlineTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
+                                            ?: "None",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }
 
                         Text(
-                            "Priority",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = "Priority",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.padding(top = 8.dp)
                         )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(
+                                space = 24.dp,
+                                alignment = Alignment.CenterHorizontally
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Priority.entries.forEach { p ->
-                                val pColor = getPriorityColor(p)
+                                val pColor = getPriorityColor(priority = p)
                                 FilterChip(
                                     selected = priority == p,
                                     onClick = { priority = p },
-                                    label = { Text(p.name) },
+                                    label = {
+                                        Text(
+                                            text = p.name,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    },
+                                    modifier = Modifier.height(28.dp),
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = pColor.copy(alpha = 0.2f),
                                         selectedLabelColor = pColor
@@ -486,9 +558,9 @@ fun AddTaskDialog(
                                     leadingIcon = if (priority == p) {
                                         {
                                             Icon(
-                                                Icons.Default.CheckCircle,
+                                                imageVector = Icons.Default.CheckCircle,
                                                 contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(size = 14.dp)
                                             )
                                         }
                                     } else null
@@ -498,15 +570,15 @@ fun AddTaskDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
-
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(space = 12.dp)
                 ) {
                     TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(0.5f)
+                        modifier = Modifier.weight(weight = 0.4f)
                     ) {
                         Text("Cancel")
                     }
@@ -553,4 +625,3 @@ fun AddTaskDialog(
         }
     }
 }
-
