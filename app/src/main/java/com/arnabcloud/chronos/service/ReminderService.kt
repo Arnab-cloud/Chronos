@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
@@ -13,11 +14,19 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import com.arnabcloud.chronos.MainActivity
+import com.arnabcloud.chronos.data.SettingsDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class ReminderService : Service() {
     private var ringtone: Ringtone? = null
     private var vibrator: Vibrator? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -34,29 +43,56 @@ class ReminderService : Service() {
         }
 
         showNotification(itemId, itemTitle, itemType)
-        startAlarm()
+
+        serviceScope.launch {
+            val settingsDataStore = SettingsDataStore(applicationContext)
+            val alarmToneUri = settingsDataStore.alarmToneFlow.first()
+            val vibrationEnabled = settingsDataStore.vibrationEnabledFlow.first()
+            val silentModeOverride = settingsDataStore.silentModeOverrideFlow.first()
+
+            startAlarm(alarmToneUri, vibrationEnabled, silentModeOverride)
+        }
 
         return START_STICKY
     }
 
-    private fun startAlarm() {
-        val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-
-        ringtone = RingtoneManager.getRingtone(applicationContext, alarmUri)
-        ringtone?.play()
-
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager =
-                getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
+    private fun startAlarm(
+        toneUriString: String,
+        vibrationEnabled: Boolean,
+        silentModeOverride: Boolean
+    ) {
+        val alarmUri = if (toneUriString.isNotEmpty()) {
+            toneUriString.toUri()
         } else {
-            @Suppress("DEPRECATION")
-            getSystemService(VIBRATOR_SERVICE) as Vibrator
+            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
         }
 
-        val pattern = longArrayOf(0, 500, 500)
-        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        ringtone = RingtoneManager.getRingtone(applicationContext, alarmUri)
+        ringtone?.isLooping = true
+
+        if (silentModeOverride) {
+            ringtone?.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        }
+
+        ringtone?.play()
+
+        if (vibrationEnabled) {
+            vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager =
+                    getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
+            }
+
+            val pattern = longArrayOf(0, 500, 500)
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        }
     }
 
     private fun stopAlarm() {
