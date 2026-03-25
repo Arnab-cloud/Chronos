@@ -1,5 +1,6 @@
 package com.arnabcloud.chronos.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
@@ -35,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.arnabcloud.chronos.model.Priority
+import com.arnabcloud.chronos.model.RecurrenceType
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.ui.theme.EventColor
 import com.arnabcloud.chronos.ui.theme.getPriorityColor
@@ -94,6 +98,9 @@ fun AddTaskDialog(
     var priority by remember { mutableStateOf(Priority.LOW) }
     var taskTime by remember { mutableStateOf<LocalTime?>(null) }
     var deadlineTime by remember { mutableStateOf<LocalTime?>(null) }
+
+    var isPeriodic by remember { mutableStateOf(false) }
+    var recurrence by remember { mutableStateOf(RecurrenceType.DAILY) }
 
     var isDurationMode by remember { mutableStateOf(false) }
 
@@ -487,42 +494,92 @@ fun AddTaskDialog(
                             }
                         }
                     } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(
-                                onClick = { showDeadlinePicker = true },
-                                modifier = Modifier.weight(1f)
-                            ) {
+                        // Periodic Task Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    Icons.Default.Flag,
+                                    Icons.Default.Repeat,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    if (deadlineDate == null) "Deadline" else "Due: ${
-                                        deadlineDate?.format(
-                                            DateTimeFormatter.ofPattern("MMM dd")
-                                        )
-                                    }",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Repeat Task", style = MaterialTheme.typography.bodyMedium)
                             }
-                            if (deadlineDate != null) {
+                            Switch(
+                                checked = isPeriodic,
+                                onCheckedChange = { isPeriodic = it }
+                            )
+                        }
+
+                        AnimatedVisibility(visible = isPeriodic) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                            ) {
+                                RecurrenceType.entries.forEach { type ->
+                                    FilterChip(
+                                        selected = recurrence == type,
+                                        onClick = { recurrence = type },
+                                        label = {
+                                            Text(
+                                                type.name.lowercase()
+                                                    .replaceFirstChar { it.uppercase() })
+                                        },
+                                        modifier = Modifier.height(28.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!isPeriodic) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(
-                                    onClick = { showDeadlineTimePicker = true },
-                                    modifier = Modifier.weight(weight = 1f)
+                                    onClick = { showDeadlinePicker = true },
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.AccessTime,
+                                        Icons.Default.Flag,
                                         contentDescription = null,
-                                        modifier = Modifier.size(size = 18.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(width = 4.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = deadlineTime?.format(DateTimeFormatter.ofPattern("hh:mm a"))
-                                            ?: "None",
+                                        if (deadlineDate == null) "Deadline" else "Due: ${
+                                            deadlineDate?.format(
+                                                DateTimeFormatter.ofPattern("MMM dd")
+                                            )
+                                        }",
                                         style = MaterialTheme.typography.bodySmall
                                     )
+                                }
+                                if (deadlineDate != null) {
+                                    TextButton(
+                                        onClick = { showDeadlineTimePicker = true },
+                                        modifier = Modifier.weight(weight = 1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(size = 18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(width = 4.dp))
+                                        Text(
+                                            text = deadlineTime?.format(
+                                                DateTimeFormatter.ofPattern(
+                                                    "hh:mm a"
+                                                )
+                                            )
+                                                ?: "None",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -600,9 +657,11 @@ fun AddTaskDialog(
                                         details = details,
                                         date = date,
                                         taskTime = taskTime,
-                                        deadlineDate = deadlineDate,
-                                        deadlineTime = deadlineTime,
-                                        priority = priority
+                                        deadlineDate = if (isPeriodic) null else deadlineDate,
+                                        deadlineTime = if (isPeriodic) null else deadlineTime,
+                                        priority = priority,
+                                        isPeriodic = isPeriodic,
+                                        recurrence = if (isPeriodic) recurrence else null
                                     )
                                 }
                                 onConfirm(item)

@@ -22,7 +22,9 @@ sealed class TimelineItem {
         val deadlineDate: LocalDate? = null,
         val deadlineTime: LocalTime? = null,
         val isCompleted: Boolean = false,
-        val priority: Priority = Priority.MEDIUM
+        val priority: Priority = Priority.MEDIUM,
+        val isPeriodic: Boolean = false,
+        val recurrence: RecurrenceType? = null
     ) : TimelineItem() {
         fun isMissed(): Boolean = !isCompleted && deadlineDate?.isBefore(LocalDate.now()) == true
     }
@@ -41,3 +43,5 @@ sealed class TimelineItem {
 }
 
 enum class Priority { LOW, MEDIUM, HIGH }
+
+enum class RecurrenceType { DAILY, WEEKLY, MONTHLY, YEARLY }

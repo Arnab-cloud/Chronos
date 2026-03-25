@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.arnabcloud.chronos.data.ChronosDatabase
 import com.arnabcloud.chronos.data.ChronosRepository
 import com.arnabcloud.chronos.data.SettingsDataStore
+import com.arnabcloud.chronos.model.RecurrenceType
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.util.ReminderManager
 import kotlinx.coroutines.flow.SharingStarted
@@ -97,14 +98,39 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
     fun toggleComplete(item: TimelineItem) {
         if (item is TimelineItem.Task) {
             viewModelScope.launch {
-                val updated = item.copy(isCompleted = !item.isCompleted)
-                repository.updateTask(updated)
-                if (updated.isCompleted) {
-                    reminderManager.cancelReminder(updated)
-                } else {
+                if (item.isPeriodic && !item.isCompleted) {
+                    // For periodic tasks, instead of marking completed, move to next date
+                    val nextDate = calculateNextDate(item.date, item.recurrence)
+                    val nextDeadline =
+                        item.deadlineDate?.let { calculateNextDate(it, item.recurrence) }
+
+                    val updated = item.copy(
+                        date = nextDate,
+                        deadlineDate = nextDeadline,
+                        isCompleted = false // Keep it active for the next occurrence
+                    )
+                    repository.updateTask(updated)
                     reminderManager.scheduleReminder(updated)
+                } else {
+                    val updated = item.copy(isCompleted = !item.isCompleted)
+                    repository.updateTask(updated)
+                    if (updated.isCompleted) {
+                        reminderManager.cancelReminder(updated)
+                    } else {
+                        reminderManager.scheduleReminder(updated)
+                    }
                 }
             }
+        }
+    }
+
+    private fun calculateNextDate(currentDate: LocalDate, recurrence: RecurrenceType?): LocalDate {
+        return when (recurrence) {
+            RecurrenceType.DAILY -> currentDate.plusDays(1)
+            RecurrenceType.WEEKLY -> currentDate.plusWeeks(1)
+            RecurrenceType.MONTHLY -> currentDate.plusMonths(1)
+            RecurrenceType.YEARLY -> currentDate.plusYears(1)
+            null -> currentDate
         }
     }
 

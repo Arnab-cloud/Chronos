@@ -1,6 +1,11 @@
 package com.arnabcloud.chronos.data
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.arnabcloud.chronos.model.TimelineItem
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -10,6 +15,9 @@ interface ChronosDao {
     // Tasks
     @Query("SELECT * FROM tasks ORDER BY date ASC, taskTime ASC")
     fun getAllTasks(): Flow<List<TimelineItem.Task>>
+
+    @Query("SELECT * FROM tasks WHERE id = :taskId")
+    suspend fun getTaskById(taskId: UUID): TimelineItem.Task?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: TimelineItem.Task)
@@ -27,6 +35,9 @@ interface ChronosDao {
     @Query("SELECT * FROM events ORDER BY date ASC, startTime ASC")
     fun getAllEvents(): Flow<List<TimelineItem.Event>>
 
+    @Query("SELECT * FROM events WHERE id = :eventId")
+    suspend fun getEventById(eventId: UUID): TimelineItem.Event?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvent(event: TimelineItem.Event)
 
@@ -35,7 +46,7 @@ interface ChronosDao {
 
     @Delete
     suspend fun deleteEvent(event: TimelineItem.Event)
-    
+
     @Query("DELETE FROM events WHERE id = :eventId")
     suspend fun deleteEventById(eventId: UUID)
 }
