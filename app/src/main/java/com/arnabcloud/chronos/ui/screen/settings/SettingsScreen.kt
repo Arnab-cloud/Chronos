@@ -68,6 +68,7 @@ fun SettingsScreen(
     val reminderType by viewModel.reminderType.collectAsState()
     val notificationTone by viewModel.notificationTone.collectAsState()
     val alarmTone by viewModel.alarmTone.collectAsState()
+    val alarmDuration by viewModel.alarmDuration.collectAsState()
 
     val preReminderEnabled by viewModel.preReminderEnabled.collectAsState()
     val preReminderTime by viewModel.preReminderTime.collectAsState()
@@ -78,6 +79,7 @@ fun SettingsScreen(
     var showSnoozeDialog by remember { mutableStateOf(false) }
     var showAccentColorDialog by remember { mutableStateOf(false) }
     var showPreReminderDialog by remember { mutableStateOf(false) }
+    var showAlarmDurationDialog by remember { mutableStateOf(false) }
 
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -168,6 +170,16 @@ fun SettingsScreen(
                         ringtonePickerLauncher.launch(intent)
                     }
                 )
+            }
+            if (reminderType == "Alarm") {
+                item {
+                    SettingsItem(
+                        title = "Alarm Duration",
+                        subtitle = if (alarmDuration == 0) "Infinite" else "$alarmDuration minutes",
+                        icon = Icons.Default.Timer,
+                        onClick = { showAlarmDurationDialog = true }
+                    )
+                }
             }
             item {
                 SettingsSwitchItem(
@@ -367,6 +379,17 @@ fun SettingsScreen(
             onSelect = {
                 viewModel.setPreReminderTime(it)
                 showPreReminderDialog = false
+            }
+        )
+    }
+
+    if (showAlarmDurationDialog) {
+        AlarmDurationSelectionDialog(
+            currentDuration = alarmDuration,
+            onDismiss = { showAlarmDurationDialog = false },
+            onSelect = {
+                viewModel.setAlarmDuration(it)
+                showAlarmDurationDialog = false
             }
         )
     }

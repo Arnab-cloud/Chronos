@@ -61,6 +61,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val preReminderTime: StateFlow<Int> = settingsDataStore.preReminderTimeFlow.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 10
     )
+    val alarmDuration: StateFlow<Int> = settingsDataStore.alarmDurationFlow.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), 0
+    )
 
     fun setTheme(theme: String) = viewModelScope.launch { settingsDataStore.setTheme(theme) }
     fun setLayout(layout: String) = viewModelScope.launch { settingsDataStore.setLayout(layout) }
@@ -105,4 +108,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setPreReminderTime(minutes: Int) =
         viewModelScope.launch { settingsDataStore.setPreReminderTime(minutes) }
+
+    fun setAlarmDuration(minutes: Int) =
+        viewModelScope.launch { settingsDataStore.setAlarmDuration(minutes) }
 }

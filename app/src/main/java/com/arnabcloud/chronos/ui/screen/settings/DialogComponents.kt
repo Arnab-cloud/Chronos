@@ -223,3 +223,44 @@ fun PreReminderSelectionDialog(
         }
     )
 }
+
+@Composable
+fun AlarmDurationSelectionDialog(
+    currentDuration: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    val options = listOf(
+        0 to "Infinite",
+        1 to "1 minute",
+        5 to "5 minutes",
+        10 to "10 minutes",
+        30 to "30 minutes"
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Alarm Duration") },
+        text = {
+            Column {
+                options.forEach { (minutes, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(minutes) }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = (minutes == currentDuration),
+                            onClick = { onSelect(minutes) }
+                        )
+                        Text(text = label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
