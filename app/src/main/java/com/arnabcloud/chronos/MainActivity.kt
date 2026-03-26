@@ -146,7 +146,9 @@ fun MainNavigation(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
+            ModalDrawerSheet(
+                modifier = Modifier.width(300.dp)
+            ) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "Chronos",
