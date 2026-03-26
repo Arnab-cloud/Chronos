@@ -1,5 +1,6 @@
 package com.arnabcloud.chronos.ui.screen.home
 
+//import androidx.compose.foundation.lazy.stickyHeader
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -69,7 +70,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,7 +79,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -104,6 +103,11 @@ import java.util.UUID
 
 const val HourSlotHeight = 100.0
 
+// Optimized: Static formatters to avoid repeated allocations
+private val MonthYearFormatter = DateTimeFormatter.ofPattern("MMMM yyyy")
+private val DateFormatter = DateTimeFormatter.ofPattern("MMM dd")
+private val TimeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
@@ -112,6 +116,11 @@ fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
     var multiSelectMode by rememberSaveable { mutableStateOf(false) }
     val selectedItems = remember { mutableStateListOf<UUID>() }
     var showMoveDialog by remember { mutableStateOf(false) }
+
+    // Optimized: Memoize filtered items for the selected date
+    val itemsForDate = remember(items, selectedDate) {
+        viewModel.getItemsForDate(selectedDate)
+    }
 
     val onClearSelection = {
         multiSelectMode = false
@@ -160,7 +169,7 @@ fun ChronosTimelineScreen(viewModel: ChronosViewModel) {
         Timeline(
             modifier = Modifier.weight(1f),
             selectedDate = selectedDate,
-            items = viewModel.getItemsForDate(selectedDate),
+            items = itemsForDate,
             selectedItems = selectedItems,
             onItemClick = { item ->
                 if (multiSelectMode) {
@@ -234,10 +243,12 @@ fun DayPicker(
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val days = (0..14).map { LocalDate.now().plusDays(it.toLong()) }
+    // Optimized: Memoize days list calculation
+    val days = remember { (0..14).map { LocalDate.now().plusDays(it.toLong()) } }
+
     Column(modifier = modifier) {
         Text(
-            text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+            text = remember(selectedDate) { selectedDate.format(MonthYearFormatter) },
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(start = 16.dp, top = 8.dp),
             fontWeight = FontWeight.Bold
@@ -280,6 +291,7 @@ fun DayPicker(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Timeline(
     modifier: Modifier = Modifier,
@@ -291,19 +303,41 @@ fun Timeline(
     onRemoveItem: (TimelineItem) -> Unit,
     onSetCompleted: (TimelineItem, Boolean) -> Unit
 ) {
-    val hours = (0..23).toList()
+    val hours = remember { (0..23).toList() }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
     var expandedUntimedTasks by rememberSaveable { mutableStateOf(setOf<UUID>()) }
 
-    // A task is unscheduled if it has no taskTime AND (no deadlineTime OR deadline is not today)
-    val untimedTasks = items.filterIsInstance<TimelineItem.Task>().filter {
-        it.taskTime == null && (it.deadlineDate != selectedDate || it.deadlineTime == null)
+    // Optimized: Filter untimed tasks once
+    val untimedTasks = remember(items, selectedDate) {
+        items.filterIsInstance<TimelineItem.Task>().filter {
+            it.taskTime == null && (it.deadlineDate != selectedDate || it.deadlineTime == null)
+        }
     }
 
-    // Timed items include events and tasks that have either a scheduled time OR a deadline time today
-    val timedItems = items.filter {
-        it is TimelineItem.Event || (it is TimelineItem.Task && (it.taskTime != null || (it.deadlineDate == selectedDate && it.deadlineTime != null)))
+    // Optimized: Group timed items by hour to avoid O(N) filtering inside LazyColumn items
+    val itemsByHour = remember(items, selectedDate) {
+        val timedItems = items.filter {
+            it is TimelineItem.Event || (it is TimelineItem.Task && (it.taskTime != null || (it.deadlineDate == selectedDate && it.deadlineTime != null)))
+        }
+        val map = mutableMapOf<Int, MutableList<TimelineItem>>()
+        timedItems.forEach { item ->
+            when (item) {
+                is TimelineItem.Event -> {
+                    map.getOrPut(item.startTime.hour) { mutableListOf() }.add(item)
+                }
+
+                is TimelineItem.Task -> {
+                    item.taskTime?.let { map.getOrPut(it.hour) { mutableListOf() }.add(item) }
+                    if (item.deadlineDate == selectedDate) {
+                        item.deadlineTime?.let {
+                            map.getOrPut(it.hour) { mutableListOf() }.add(item)
+                        }
+                    }
+                }
+            }
+        }
+        map
     }
 
     var currentTime by remember { mutableStateOf(LocalTime.now()) }
@@ -378,21 +412,9 @@ fun Timeline(
             }
 
             items(hours) { hour ->
-                val itemsInHour = timedItems.filter {
-                    when (it) {
-                        is TimelineItem.Event -> it.startTime.hour == hour
-                        is TimelineItem.Task -> {
-                            val taskHour = it.taskTime?.hour
-                            val deadlineHour =
-                                if (it.deadlineDate == selectedDate) it.deadlineTime?.hour else null
-                            // Task appears in both scheduled hour and deadline hour
-                            taskHour == hour || deadlineHour == hour
-                        }
-                    }
-                }
                 HourSlot(
                     hour = hour,
-                    itemsInHour = itemsInHour,
+                    itemsInHour = itemsByHour[hour] ?: emptyList(),
                     selectedItems = selectedItems,
                     onItemClick = onItemClick,
                     onItemLongClick = onItemLongClick,
@@ -519,11 +541,7 @@ fun UntimedTaskBookmark(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "Due: ${
-                                    task.deadlineDate.format(
-                                        DateTimeFormatter.ofPattern(
-                                            "MMM dd"
-                                        )
-                                    )
+                                    task.deadlineDate.format(DateFormatter)
                                 }",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
@@ -550,14 +568,10 @@ fun HourSlot(
     currentTime: LocalTime? = null,
     selectedDate: LocalDate
 ) {
-    var slotHeight by remember { mutableIntStateOf(0) }
-    val density = LocalDensity.current
-
     Row(
         modifier = Modifier
             .heightIn(min = HourSlotHeight.dp)
             .fillMaxWidth()
-            .onGloballyPositioned { slotHeight = it.size.height }
     ) {
         Text(
             text = String.format(Locale.getDefault(), "%02d:00", hour),
@@ -601,13 +615,15 @@ fun HourSlot(
             }
 
             if (currentTime != null) {
+                // Optimized: Removed onGloballyPositioned measurement to avoid double layout pass
                 val fraction = currentTime.minute / 60f
-                val slotHeightDp = with(density) { slotHeight.toDp() }
+                val slotContentHeight =
+                    HourSlotHeight - 16.0 // Approximate available height after top padding
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(y = 16.dp + (slotHeightDp - 16.dp) * fraction),
+                        .offset(y = 16.dp + (slotContentHeight.dp) * fraction),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
@@ -746,10 +762,8 @@ fun EventCard(item: TimelineItem.Event, isSelected: Boolean, modifier: Modifier 
                     )
                 }
                 val timeText = if (item.isAllDay) "All Day" else "${
-                    item.startTime.format(
-                        DateTimeFormatter.ofPattern("hh:mm a")
-                    )
-                } - ${item.endTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
+                    item.startTime.format(TimeFormatter)
+                } - ${item.endTime.format(TimeFormatter)}"
                 Text(
                     text = timeText,
                     style = MaterialTheme.typography.labelSmall,
@@ -880,7 +894,7 @@ fun TaskCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = it.format(DateTimeFormatter.ofPattern("hh:mm a")),
+                                text = it.format(TimeFormatter),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -902,7 +916,7 @@ fun TaskCard(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Due: ${it.format(DateTimeFormatter.ofPattern("hh:mm a"))}",
+                                    text = "Due: ${it.format(TimeFormatter)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isMissed) MissedColor else contentColor.copy(alpha = 0.7f)

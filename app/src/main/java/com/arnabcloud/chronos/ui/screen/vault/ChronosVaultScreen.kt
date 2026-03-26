@@ -44,7 +44,11 @@ fun ChronosVaultScreen(viewModel: ChronosViewModel) {
             verticalArrangement = Arrangement.spacedBy(space = VaultScreenDefaults.ITEM_SPACING),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(items) { item ->
+            // Optimized: Added key for better performance and animations
+            items(
+                items = items,
+                key = { it.id }
+            ) { item ->
                 VaultItemCard(
                     item = item,
                     onToggle = { viewModel.toggleComplete(item) },

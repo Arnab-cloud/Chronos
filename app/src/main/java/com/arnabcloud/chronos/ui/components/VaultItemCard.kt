@@ -32,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,6 +55,9 @@ import com.arnabcloud.chronos.ui.theme.getPriorityColor
 import com.arnabcloud.chronos.ui.theme.getPriorityContainerColor
 import java.time.format.DateTimeFormatter
 
+private val DateFormatter = DateTimeFormatter.ofPattern("MMM dd")
+private val TimeFormatter = DateTimeFormatter.ofPattern("hh:mm a")
+
 private object VaultItemCardDefaults {
     val ACCENT_BAR_WIDTH = 6.dp
     val CARD_PADDING = 16.dp
@@ -67,7 +71,7 @@ private object VaultItemCardDefaults {
     val METADATA_TOP_PADDING = 8.dp
     val METADATA_SPACING = 12.dp
     val META_ICON_TEXT_SPACING = 4.dp
-    
+
     val MISSED_BORDER_WIDTH = 2.dp
     const val MISSED_ALPHA_DARK = 0.15f
     const val MISSED_ALPHA_LIGHT = 0.05f
@@ -92,7 +96,9 @@ fun VaultItemCard(
     val isMissed = (item as? TimelineItem.Task)?.isMissed() == true
     val isDark = isSystemInDarkTheme()
 
-    val accentColor = getAccentColor(item, isTask, isCompleted, isMissed)
+    val accentColor = remember(item, isTask, isCompleted, isMissed) {
+        getAccentColor(item, isTask, isCompleted, isMissed)
+    }
     val containerColor = getContainerColor(item, isTask, isCompleted, isMissed, isDark)
     val contentColor = getContentColor(isTask, isCompleted, isMissed, isDark)
 
@@ -114,7 +120,6 @@ fun VaultItemCard(
             modifier = Modifier.height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left Accent Bar
             Box(
                 modifier = Modifier
                     .width(VaultItemCardDefaults.ACCENT_BAR_WIDTH)
@@ -126,7 +131,6 @@ fun VaultItemCard(
                 modifier = Modifier.padding(VaultItemCardDefaults.CARD_PADDING),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Status Icon or Checkbox
                 ItemStatusIcon(
                     isTask = isTask,
                     isCompleted = isCompleted,
@@ -134,7 +138,6 @@ fun VaultItemCard(
                     onToggle = onToggle
                 )
 
-                // Main Content
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -167,14 +170,13 @@ fun VaultItemCard(
                     )
                 }
 
-                // Delete Action
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = if (isDark) 
-                            Color.White.copy(alpha = VaultItemCardDefaults.DISABLED_ICON_ALPHA_DARK) 
-                        else 
+                        tint = if (isDark)
+                            Color.White.copy(alpha = VaultItemCardDefaults.DISABLED_ICON_ALPHA_DARK)
+                        else
                             Color.Black.copy(alpha = VaultItemCardDefaults.DISABLED_ICON_ALPHA_LIGHT),
                         modifier = Modifier.size(VaultItemCardDefaults.ICON_SIZE_MEDIUM)
                     )
@@ -237,15 +239,16 @@ private fun ItemHeader(
             textDecoration = if (isCompleted) TextDecoration.LineThrough else null,
             modifier = Modifier.weight(1f, fill = false)
         )
-        
+
         Spacer(modifier = Modifier.width(VaultItemCardDefaults.BADGE_SPACING))
-        
+
         when {
             !isTask -> StatusBadge(
                 text = "EVENT",
                 containerColor = accentColor.copy(alpha = VaultItemCardDefaults.ICON_BG_ALPHA),
                 contentColor = contentColor
             )
+
             isMissed && !isCompleted -> StatusBadge(
                 text = "MISSED",
                 containerColor = MissedColor,
@@ -284,18 +287,16 @@ private fun ItemMetadata(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(VaultItemCardDefaults.METADATA_SPACING)
     ) {
-        // Time/Date Info
         MetadataInfo(
             icon = Icons.Default.AccessTime,
-            text = getItemTimeText(item),
+            text = remember(item) { getItemTimeText(item) },
             color = contentColor.copy(alpha = VaultItemCardDefaults.META_ALPHA)
         )
 
-        // Deadline Info for Tasks
         if (item is TimelineItem.Task && item.deadlineDate != null) {
             MetadataInfo(
                 icon = Icons.Default.Flag,
-                text = "Due ${item.deadlineDate.format(DateTimeFormatter.ofPattern("MMM dd"))}",
+                text = remember(item.deadlineDate) { "Due ${item.deadlineDate.format(DateFormatter)}" },
                 color = if (isMissed) MissedColor else accentColor.copy(alpha = VaultItemCardDefaults.META_ALPHA),
                 isBold = true
             )
@@ -328,14 +329,13 @@ private fun MetadataInfo(
 }
 
 private fun getItemTimeText(item: TimelineItem): String {
-    val dateStr = item.date.format(DateTimeFormatter.ofPattern("MMM dd"))
+    val dateStr = item.date.format(DateFormatter)
     val timeStr = when (item) {
         is TimelineItem.Event -> if (item.isAllDay) "All Day" else item.startTime.format(
-            DateTimeFormatter.ofPattern("hh:mm a")
+            TimeFormatter
         )
-        is TimelineItem.Task -> {
-            item.taskTime?.format(DateTimeFormatter.ofPattern("hh:mm a")) ?: "Anytime"
-        }
+
+        is TimelineItem.Task -> item.taskTime?.format(TimeFormatter) ?: "Anytime"
     }
     return "$dateStr • $timeStr"
 }
@@ -364,9 +364,11 @@ private fun getContainerColor(
     !isTask -> if (isDark) EventColorDark else EventColorLight
     isCompleted -> if (isDark) CompletedContainerDark else CompletedContainerLight
     isMissed -> {
-        val alpha = if (isDark) VaultItemCardDefaults.MISSED_ALPHA_DARK else VaultItemCardDefaults.MISSED_ALPHA_LIGHT
+        val alpha =
+            if (isDark) VaultItemCardDefaults.MISSED_ALPHA_DARK else VaultItemCardDefaults.MISSED_ALPHA_LIGHT
         MissedColor.copy(alpha = alpha)
     }
+
     item is TimelineItem.Task -> getPriorityContainerColor(item.priority, isDark)
     else -> MaterialTheme.colorScheme.surface
 }
