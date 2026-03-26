@@ -145,6 +145,7 @@ fun MainNavigation(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = animationsEnabled,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.width(300.dp)
@@ -161,7 +162,7 @@ fun MainNavigation(
                     selected = activeSettingsScreen is ActiveSettingsScreen.Main,
                     onClick = {
                         coroutineScope.launch {
-                            drawerState.close()
+                            if (animationsEnabled) drawerState.close() else drawerState.snapTo(DrawerValue.Closed)
                             activeSettingsScreen = ActiveSettingsScreen.Main
                         }
                     },
@@ -173,7 +174,7 @@ fun MainNavigation(
                     selected = activeSettingsScreen is ActiveSettingsScreen.About,
                     onClick = {
                         coroutineScope.launch {
-                            drawerState.close()
+                            if (animationsEnabled) drawerState.close() else drawerState.snapTo(DrawerValue.Closed)
                             activeSettingsScreen = ActiveSettingsScreen.About
                         }
                     },
@@ -188,7 +189,11 @@ fun MainNavigation(
                 TopAppBar(
                     title = { Text(bottomNavItems[pagerState.currentPage].label) },
                     actions = {
-                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                        IconButton(onClick = { 
+                            coroutineScope.launch { 
+                                if (animationsEnabled) drawerState.open() else drawerState.snapTo(DrawerValue.Open)
+                            } 
+                        }) {
                             Icon(Icons.Default.Menu, contentDescription = "Menu")
                         }
                     }
@@ -201,7 +206,11 @@ fun MainNavigation(
                             selected = pagerState.currentPage == index,
                             onClick = {
                                 coroutineScope.launch {
-                                    pagerState.animateScrollToPage(page = index)
+                                    if (animationsEnabled) {
+                                        pagerState.animateScrollToPage(page = index)
+                                    } else {
+                                        pagerState.scrollToPage(index)
+                                    }
                                 }
                             },
                             label = { Text(text = screen.label) },
@@ -277,7 +286,7 @@ fun MainNavigation(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.padding(paddingValues = innerPadding),
-                userScrollEnabled = true
+                userScrollEnabled = animationsEnabled
             ) { page ->
                 when (bottomNavItems[page]) {
                     Screen.Vault -> ChronosVaultScreen(chronosViewModel)
