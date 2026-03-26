@@ -86,7 +86,7 @@ private object DetailDialogDefaults {
     val ICON_SIZE_MEDIUM = 18.dp
     val ICON_SIZE_LARGE = 20.dp
 
-    const val DIALOG_WIDTH_FRACTION = 0.9f
+    const val DIALOG_WIDTH_FRACTION = 0.95f
     const val DURATION_DIALOG_WIDTH_FRACTION = 0.85f
     const val TONAL_ELEVATION = 6
     const val CONTAINER_ALPHA_MUTED = 0.2f
