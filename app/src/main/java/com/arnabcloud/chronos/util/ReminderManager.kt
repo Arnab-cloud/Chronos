@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.arnabcloud.chronos.model.RecurrenceType
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.receiver.ReminderReceiver
 import java.time.LocalDateTime
@@ -30,11 +31,20 @@ class ReminderManager(private val context: Context) {
             }
         }
 
-        val reminderTime = getReminderTime(item) ?: return
+        var reminderTime = getReminderTime(item) ?: return
+
+        // Handle periodic tasks: If the initial time is in the past, move to the next occurrence
+        if (item is TimelineItem.Task && item.isPeriodic) {
+            val now = LocalDateTime.now()
+            while (reminderTime.isBefore(now)) {
+                reminderTime = calculateNextDateTime(reminderTime, item.recurrence)
+            }
+        }
+
         val epochMilli = reminderTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        // Don't schedule if it's in the past
-        if (epochMilli <= System.currentTimeMillis()) return
+        // For non-periodic items, don't schedule if it's in the past
+        if (!(item is TimelineItem.Task && item.isPeriodic) && epochMilli <= System.currentTimeMillis()) return
 
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("ITEM_ID", item.id.toString())
@@ -87,6 +97,19 @@ class ReminderManager(private val context: Context) {
                     item.date.atTime(it)
                 }
             }
+        }
+    }
+
+    private fun calculateNextDateTime(
+        current: LocalDateTime,
+        recurrence: RecurrenceType?
+    ): LocalDateTime {
+        return when (recurrence) {
+            RecurrenceType.DAILY -> current.plusDays(1)
+            RecurrenceType.WEEKLY -> current.plusWeeks(1)
+            RecurrenceType.MONTHLY -> current.plusMonths(1)
+            RecurrenceType.YEARLY -> current.plusYears(1)
+            null -> current
         }
     }
 }

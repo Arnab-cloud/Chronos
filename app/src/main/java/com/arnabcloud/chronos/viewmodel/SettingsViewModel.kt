@@ -64,6 +64,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val alarmDuration: StateFlow<Int> = settingsDataStore.alarmDurationFlow.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), 0
     )
+    val defaultRepetitiveTime: StateFlow<String> =
+        settingsDataStore.defaultRepetitiveTimeFlow.stateIn(
+            viewModelScope, SharingStarted.WhileSubscribed(5000), "09:00"
+        )
 
     fun setTheme(theme: String) = viewModelScope.launch { settingsDataStore.setTheme(theme) }
     fun setLayout(layout: String) = viewModelScope.launch { settingsDataStore.setLayout(layout) }
@@ -111,4 +115,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setAlarmDuration(minutes: Int) =
         viewModelScope.launch { settingsDataStore.setAlarmDuration(minutes) }
+
+    fun setDefaultRepetitiveTime(time: String) =
+        viewModelScope.launch { settingsDataStore.setDefaultRepetitiveTime(time) }
 }

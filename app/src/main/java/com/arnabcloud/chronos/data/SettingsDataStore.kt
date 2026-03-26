@@ -33,6 +33,7 @@ class SettingsDataStore(private val context: Context) {
         val PRE_REMINDER_ENABLED_KEY = booleanPreferencesKey("pre_reminder_enabled")
         val PRE_REMINDER_TIME_KEY = intPreferencesKey("pre_reminder_time")
         val ALARM_DURATION_KEY = intPreferencesKey("alarm_duration") // New key: 0 means infinite
+        val DEFAULT_REPETITIVE_TIME_KEY = stringPreferencesKey("default_repetitive_time")
     }
 
     val themeFlow: Flow<String> = context.dataStore.data.map { it[THEME_KEY] ?: "System Default" }
@@ -62,6 +63,8 @@ class SettingsDataStore(private val context: Context) {
     val preReminderTimeFlow: Flow<Int> =
         context.dataStore.data.map { it[PRE_REMINDER_TIME_KEY] ?: 10 }
     val alarmDurationFlow: Flow<Int> = context.dataStore.data.map { it[ALARM_DURATION_KEY] ?: 0 }
+    val defaultRepetitiveTimeFlow: Flow<String> =
+        context.dataStore.data.map { it[DEFAULT_REPETITIVE_TIME_KEY] ?: "09:00" }
 
     suspend fun setTheme(theme: String) {
         context.dataStore.edit { it[THEME_KEY] = theme }
@@ -129,5 +132,9 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setAlarmDuration(minutes: Int) {
         context.dataStore.edit { it[ALARM_DURATION_KEY] = minutes }
+    }
+
+    suspend fun setDefaultRepetitiveTime(time: String) {
+        context.dataStore.edit { it[DEFAULT_REPETITIVE_TIME_KEY] = time }
     }
 }

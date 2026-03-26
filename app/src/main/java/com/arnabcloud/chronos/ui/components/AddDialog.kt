@@ -44,6 +44,8 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,12 +57,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arnabcloud.chronos.model.Priority
 import com.arnabcloud.chronos.model.RecurrenceType
 import com.arnabcloud.chronos.model.TimelineItem
 import com.arnabcloud.chronos.ui.theme.EventColor
 import com.arnabcloud.chronos.ui.theme.getPriorityColor
 import com.arnabcloud.chronos.util.formatDuration
+import com.arnabcloud.chronos.viewmodel.SettingsViewModel
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -86,7 +90,8 @@ fun PreviewDialog() {
 fun AddTaskDialog(
     isEvent: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (TimelineItem) -> Unit
+    onConfirm: (TimelineItem) -> Unit,
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     var title by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
@@ -111,6 +116,19 @@ fun AddTaskDialog(
     var showDeadlinePicker by remember { mutableStateOf(false) }
     var showTaskTimePicker by remember { mutableStateOf(false) }
     var showDeadlineTimePicker by remember { mutableStateOf(false) }
+
+    val defaultRepetitiveTimeStr by settingsViewModel.defaultRepetitiveTime.collectAsState()
+
+    // Automatically set task time when periodic is enabled if not already set
+    LaunchedEffect(isPeriodic) {
+        if (isPeriodic && taskTime == null) {
+            taskTime = try {
+                LocalTime.parse(defaultRepetitiveTimeStr)
+            } catch (_: Exception) {
+                LocalTime.of(9, 0)
+            }
+        }
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
@@ -328,26 +346,15 @@ fun AddTaskDialog(
                         ) {
                             Text(
                                 text = if (isEvent) "NEW EVENT" else "NEW TASK",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Black),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Black),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
-                        Text(
-                            text = if (isEvent) "Create Event" else "Create Task",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close Dialog")
                     }
                 }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
 
                 Column(
                     modifier = Modifier

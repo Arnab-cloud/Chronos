@@ -34,8 +34,8 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
             repository.allTasks,
             repository.allEvents,
             settingsDataStore.sortOrderFlow
-        ) { tasks, events, sortOrder ->
-            val allItems = tasks + events
+        ) { tasks: List<TimelineItem.Task>, events: List<TimelineItem.Event>, sortOrder: String ->
+            val allItems: List<TimelineItem> = tasks + events
             when (sortOrder) {
                 "By Priority" -> allItems.sortedWith(
                     compareByDescending<TimelineItem> {
@@ -43,7 +43,7 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
                     }.thenBy { it.date }
                 )
 
-                "By Creation Date" -> allItems.sortedBy { it.id.timestamp() } // UUID v7 if used, otherwise fallback
+                "By Creation Date" -> allItems.sortedBy { it.id.timestamp() }
                 "By Time" -> allItems.sortedWith(
                     compareBy<TimelineItem> { it.date }.thenBy {
                         when (it) {
@@ -62,16 +62,38 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
         )
     }
 
-    // Fallback for non-v7 UUIDs to sort by "creation" (simplified)
     private fun UUID.timestamp(): Long = this.mostSignificantBits
 
     fun addItem(item: TimelineItem) {
         viewModelScope.launch {
-            when (item) {
-                is TimelineItem.Task -> repository.insertTask(item)
-                is TimelineItem.Event -> repository.insertEvent(item)
+            val processedItem = if (item is TimelineItem.Task && item.isPeriodic) {
+                val now = java.time.LocalDateTime.now()
+                var reminderDateTime = item.taskTime?.let { item.date.atTime(it) }
+                    ?: item.date.atTime(LocalTime.MIDNIGHT)
+
+                var currentItem: TimelineItem.Task = item
+                while (reminderDateTime.isBefore(now)) {
+                    val nextDate = calculateNextDate(currentItem.date, currentItem.recurrence)
+                    val nextDeadline = currentItem.deadlineDate?.let {
+                        calculateNextDate(it, currentItem.recurrence)
+                    }
+                    currentItem = currentItem.copy(
+                        date = nextDate,
+                        deadlineDate = nextDeadline
+                    )
+                    reminderDateTime = currentItem.taskTime?.let { currentItem.date.atTime(it) }
+                        ?: currentItem.date.atTime(LocalTime.MIDNIGHT)
+                }
+                currentItem
+            } else {
+                item
             }
-            reminderManager.scheduleReminder(item)
+
+            when (processedItem) {
+                is TimelineItem.Task -> repository.insertTask(processedItem)
+                is TimelineItem.Event -> repository.insertEvent(processedItem)
+            }
+            reminderManager.scheduleReminder(processedItem)
         }
     }
 
@@ -99,7 +121,6 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
         if (item is TimelineItem.Task) {
             viewModelScope.launch {
                 if (item.isPeriodic && !item.isCompleted) {
-                    // For periodic tasks, instead of marking completed, move to next date
                     val nextDate = calculateNextDate(item.date, item.recurrence)
                     val nextDeadline =
                         item.deadlineDate?.let { calculateNextDate(it, item.recurrence) }
@@ -107,7 +128,7 @@ class ChronosViewModel(applicationContext: Application) : AndroidViewModel(appli
                     val updated = item.copy(
                         date = nextDate,
                         deadlineDate = nextDeadline,
-                        isCompleted = false // Keep it active for the next occurrence
+                        isCompleted = false
                     )
                     repository.updateTask(updated)
                     reminderManager.scheduleReminder(updated)

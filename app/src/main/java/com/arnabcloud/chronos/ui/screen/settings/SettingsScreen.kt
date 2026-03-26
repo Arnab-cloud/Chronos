@@ -45,6 +45,8 @@ import androidx.core.content.IntentCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arnabcloud.chronos.viewmodel.SettingsViewModel
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +74,7 @@ fun SettingsScreen(
 
     val preReminderEnabled by viewModel.preReminderEnabled.collectAsState()
     val preReminderTime by viewModel.preReminderTime.collectAsState()
+    val defaultRepetitiveTime by viewModel.defaultRepetitiveTime.collectAsState()
 
     var showThemeDialog by remember { mutableStateOf(false) }
     var showLayoutDialog by remember { mutableStateOf(false) }
@@ -80,6 +83,7 @@ fun SettingsScreen(
     var showAccentColorDialog by remember { mutableStateOf(false) }
     var showPreReminderDialog by remember { mutableStateOf(false) }
     var showAlarmDurationDialog by remember { mutableStateOf(false) }
+    var showDefaultRepetitiveTimeDialog by remember { mutableStateOf(false) }
 
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -262,6 +266,19 @@ fun SettingsScreen(
             }
             item {
                 SettingsItem(
+                    title = "Default Repetitive Time",
+                    subtitle = try {
+                        LocalTime.parse(defaultRepetitiveTime)
+                            .format(DateTimeFormatter.ofPattern("hh:mm a"))
+                    } catch (_: Exception) {
+                        defaultRepetitiveTime
+                    },
+                    icon = Icons.Default.AccessTime,
+                    onClick = { showDefaultRepetitiveTimeDialog = true }
+                )
+            }
+            item {
+                SettingsItem(
                     title = "Sort Order",
                     subtitle = sortOrder,
                     icon = Icons.AutoMirrored.Filled.Sort,
@@ -390,6 +407,17 @@ fun SettingsScreen(
             onSelect = {
                 viewModel.setAlarmDuration(it)
                 showAlarmDurationDialog = false
+            }
+        )
+    }
+
+    if (showDefaultRepetitiveTimeDialog) {
+        DefaultRepetitiveTimeDialog(
+            currentTime = defaultRepetitiveTime,
+            onDismiss = { showDefaultRepetitiveTimeDialog = false },
+            onSelect = {
+                viewModel.setDefaultRepetitiveTime(it)
+                showDefaultRepetitiveTimeDialog = false
             }
         )
     }
