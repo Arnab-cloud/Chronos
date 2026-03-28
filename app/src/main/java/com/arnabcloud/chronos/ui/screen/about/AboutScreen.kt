@@ -1,6 +1,8 @@
 package com.arnabcloud.chronos.ui.screen.about
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,10 +30,9 @@ import com.arnabcloud.chronos.ui.screen.settings.SettingsItem
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBackClick: () -> Unit) {
-
     val context = LocalContext.current
     val version = remember { context.getAppVersionName() }
-
+    val repoUrl = "https://github.com/Arnab-cloud/Chronos"
 
     Scaffold(
         topBar = {
@@ -66,7 +67,10 @@ fun AboutScreen(onBackClick: () -> Unit) {
                 SettingsItem(
                     title = "Changelog",
                     icon = Icons.Default.History,
-                    onClick = {}
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/changelog.md"))
+                        context.startActivity(intent)
+                    }
                 )
             }
 
@@ -75,14 +79,20 @@ fun AboutScreen(onBackClick: () -> Unit) {
                 SettingsItem(
                     title = "Privacy Policy",
                     icon = Icons.Default.PrivacyTip,
-                    onClick = {}
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/PRIVACY.md"))
+                        context.startActivity(intent)
+                    }
                 )
             }
             item {
                 SettingsItem(
                     title = "Terms of Service",
                     icon = Icons.Default.Description,
-                    onClick = {}
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/TERMS.md"))
+                        context.startActivity(intent)
+                    }
                 )
             }
 
@@ -91,14 +101,23 @@ fun AboutScreen(onBackClick: () -> Unit) {
                 SettingsItem(
                     title = "Contact Support",
                     icon = Icons.Default.Email,
-                    onClick = {}
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:arnab.santra.cse26@heritageit.edu.in")
+                            putExtra(Intent.EXTRA_SUBJECT, "Chronos App Support - v$version")
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Send Email"))
+                    }
                 )
             }
             item {
                 SettingsItem(
-                    title = "Rate App",
+                    title = "Star on GitHub ⭐",
                     icon = Icons.Default.Star,
-                    onClick = {}
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl))
+                        context.startActivity(intent)
+                    }
                 )
             }
         }
