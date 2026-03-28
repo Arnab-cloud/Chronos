@@ -5,6 +5,7 @@
 ### Bug Fixes
 
 - Update branch references from main to master (8be76e5)
+- Change the branch name from main to master in changelog.yml (e0f0806)
 
 ### Miscellaneous Tasks
 
