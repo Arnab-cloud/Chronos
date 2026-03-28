@@ -68,7 +68,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     title = "Changelog",
                     icon = Icons.Default.History,
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/changelog.md"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/releases"))
                         context.startActivity(intent)
                     }
                 )
@@ -80,7 +80,8 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     title = "Privacy Policy",
                     icon = Icons.Default.PrivacyTip,
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/PRIVACY.md"))
+                        val intent =
+                            Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/PRIVACY.md"))
                         context.startActivity(intent)
                     }
                 )
@@ -90,7 +91,8 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     title = "Terms of Service",
                     icon = Icons.Default.Description,
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/TERMS.md"))
+                        val intent =
+                            Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/TERMS.md"))
                         context.startActivity(intent)
                     }
                 )
