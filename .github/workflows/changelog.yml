@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Allows the bot to push the changelog.md
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -17,7 +19,7 @@ jobs:
           fetch-depth: 0 # Important: fetch all history for log generation
 
       - name: Generate Changelog
-        uses: orhun/git-cliff-action@v3
+        uses: orhun/git-cliff-action@v4
         id: git-cliff
         with:
           config: cliff.toml
