@@ -27,7 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.arnabcloud.chronos.ui.components.AddTaskDialog
 import com.arnabcloud.chronos.ui.screen.calender.ChronosCalendarScreen
 import com.arnabcloud.chronos.ui.screen.home.ChronosTimelineScreen
-import com.arnabcloud.chronos.ui.screen.settings.AboutScreen
+import com.arnabcloud.chronos.ui.screen.about.AboutScreen
 import com.arnabcloud.chronos.ui.screen.settings.SettingsScreen
 import com.arnabcloud.chronos.ui.screen.vault.ChronosVaultScreen
 import com.arnabcloud.chronos.ui.theme.ChronosTheme
