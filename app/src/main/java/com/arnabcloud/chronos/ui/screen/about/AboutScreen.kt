@@ -81,7 +81,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.PrivacyTip,
                     onClick = {
                         val intent =
-                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/main/PRIVACY.md".toUri())
+                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/master/PRIVACY.md".toUri())
                         context.startActivity(intent)
                     }
                 )
@@ -92,7 +92,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.Description,
                     onClick = {
                         val intent =
-                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/main/TERMS.md".toUri())
+                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/master/TERMS.md".toUri())
                         context.startActivity(intent)
                     }
                 )
