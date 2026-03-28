@@ -2,7 +2,6 @@ package com.arnabcloud.chronos.ui.screen.about
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import com.arnabcloud.chronos.ui.screen.settings.SettingsCategoryHeader
 import com.arnabcloud.chronos.ui.screen.settings.SettingsItem
 
@@ -68,7 +68,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     title = "Changelog",
                     icon = Icons.Default.History,
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/releases"))
+                        val intent = Intent(Intent.ACTION_VIEW, "$repoUrl/releases".toUri())
                         context.startActivity(intent)
                     }
                 )
@@ -81,7 +81,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.PrivacyTip,
                     onClick = {
                         val intent =
-                            Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/PRIVACY.md"))
+                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/main/PRIVACY.md".toUri())
                         context.startActivity(intent)
                     }
                 )
@@ -92,7 +92,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.Description,
                     onClick = {
                         val intent =
-                            Intent(Intent.ACTION_VIEW, Uri.parse("$repoUrl/blob/main/TERMS.md"))
+                            Intent(Intent.ACTION_VIEW, "$repoUrl/blob/main/TERMS.md".toUri())
                         context.startActivity(intent)
                     }
                 )
@@ -105,7 +105,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.Email,
                     onClick = {
                         val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:arnab.santra.cse26@heritageit.edu.in")
+                            data = "mailto:arnab.santra.cse26@heritageit.edu.in".toUri()
                             putExtra(Intent.EXTRA_SUBJECT, "Chronos App Support - v$version")
                         }
                         context.startActivity(Intent.createChooser(intent, "Send Email"))
@@ -117,7 +117,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
                     title = "Star on GitHub ⭐",
                     icon = Icons.Default.Star,
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl))
+                        val intent = Intent(Intent.ACTION_VIEW, repoUrl.toUri())
                         context.startActivity(intent)
                     }
                 )
