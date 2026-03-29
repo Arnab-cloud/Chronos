@@ -1,4 +1,4 @@
-# Chronos
+# Chronos ⏳
 
 **Chronos** is a modern, minimalist, and offline-first time management application built with Jetpack Compose. It combines a powerful "Vault" for capturing all your ideas and tasks with a dynamic "Timeline" for planning your day with precision.
 
@@ -6,29 +6,24 @@
 ![Kotlin](https://img.shields.io/badge/kotlin-v1.9.0-blue.svg)
 ![Compose](https://img.shields.io/badge/Jetpack_Compose-2024.02.01-green.svg)
 
-## Demo Video
+## 📺 Demo Video
 Check out Chronos in action:
 
-[![Watch the Demo](https://img.youtube.com/vi/AhgHmIloGfM/0.jpg)](https://youtube.com/shorts/AhgHmIloGfM)
+<a href="https://youtube.com/shorts/AhgHmIloGfM">
+  <img src="https://img.youtube.com/vi/AhgHmIloGfM/0.jpg" alt="Watch the Demo" width="600">
+</a>
 
-## Screenshots
+## 📸 Screenshots
 
-### Tasks (The Vault)
-![Tasks](demo/Screenshot_20260329_122344.png)
+|                      Tasks (The Vault)                      |                      Today (Timeline)                       |                       Plan (Calendar)                       |
+|:-----------------------------------------------------------:|:-----------------------------------------------------------:|:-----------------------------------------------------------:|
+| <img src="demo/Screenshot_20260329_122344.png" width="250"> | <img src="demo/Screenshot_20260329_122449.png" width="250"> | <img src="demo/Screenshot_20260329_122505.png" width="250"> |
 
-### Today (Timeline)
-![Today](demo/Screenshot_20260329_122449.png)
+|                      Settings & Themes                      |                        About Screen                         |
+|:-----------------------------------------------------------:|:-----------------------------------------------------------:|
+| <img src="demo/Screenshot_20260329_122524.png" width="250"> | <img src="demo/Screenshot_20260329_122531.png" width="250"> |
 
-### Plan (Calendar)
-![Plan](demo/Screenshot_20260329_122505.png)
-
-### Settings & Themes
-![Settings](demo/Screenshot_20260329_122524.png)
-
-### About Screen
-![About](demo/Screenshot_20260329_122531.png)
-
-## Features
+## ✨ Features
 
 - **Timeline View**: A vertical, hour-by-hour breakdown of your day.
 - **The Vault**: A central repository for all your tasks, events, and unscheduled ideas.
@@ -38,7 +33,7 @@ Check out Chronos in action:
 - **Offline First**: All your data stays on your device. No cloud, no tracking, no account required.
 - **Swipe Actions**: Intuitively complete or delete tasks with simple gestures.
 
-## Built With
+## 🛠️ Built With
 
 - **[Kotlin](https://kotlinlang.org/)** - The primary programming language.
 - **[Jetpack Compose](https://developer.android.com/jetpack/compose)** - Modern toolkit for building native UI.
@@ -47,7 +42,7 @@ Check out Chronos in action:
 - **[Kotlin Coroutines](https://kotlinlang.org/docs/coroutines-overview.html)** - For asynchronous programming.
 - **[Material 3](https://m3.material.io/)** - Google's latest design system.
 
-## Getting Started
+## 🚀 Getting Started
 
 1. Clone the repository:
    ```bash
@@ -56,7 +51,7 @@ Check out Chronos in action:
 2. Open the project in **Android Studio (Iguana or newer)**.
 3. Build and run the app on an emulator or a physical device.
 
-## Contributing
+## 🤝 Contributing
 
 Chronos is an open-source project and welcomes contributions!
 1. Fork the Project.
@@ -65,11 +60,11 @@ Chronos is an open-source project and welcomes contributions!
 4. Push to the Branch (`git push origin feature/AmazingFeature`).
 5. Open a Pull Request.
 
-## License
+## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
-## Contact
+## 📧 Contact
 
 Arnab Santra - [arnab.santra.cse26@heritageit.edu.in](mailto:arnab.santra.cse26@heritageit.edu.in)
 
